@@ -11,6 +11,17 @@ const generateSlug = (name) => {
     .replace(/-+/g, '-');
 };
 
+const sanitizeTableIdentifier = (identifier) => {
+  // Convert to lowercase, replace spaces with hyphens, remove special chars
+  return identifier
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-') // Replace spaces with hyphens
+    .replace(/[^\w-]/g, '') // Remove special characters except hyphens
+    .replace(/-+/g, '-') // Remove multiple consecutive hyphens
+    .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
+};
+
 const generateQRUrl = (restaurantSlug, tableIdentifier) => {
   // Use FRONTEND_URL for QR codes (customer-facing)
   // Fall back to BASE_URL for backwards compatibility, then localhost
@@ -56,6 +67,7 @@ const successResponse = (res, statusCode, data, message = null) => {
 module.exports = {
   generateId,
   generateSlug,
+  sanitizeTableIdentifier,
   generateQRUrl,
   validateEmail,
   sanitizeString,

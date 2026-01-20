@@ -7,6 +7,7 @@ const {
 const {
   generateId,
   generateQRUrl,
+  sanitizeTableIdentifier,
   formatTimestamp,
   errorResponse,
   successResponse
@@ -57,8 +58,15 @@ router.post('/:tenantId/tables', authenticateToken, authorizeRestaurantAdmin, ve
       return errorResponse(res, 400, 'Name and identifier are required');
     }
 
+    // Sanitize identifier to ensure valid format (lowercase, hyphens, no spaces)
+    const sanitizedIdentifier = sanitizeTableIdentifier(identifier);
+    
+    if (!sanitizedIdentifier) {
+      return errorResponse(res, 400, 'Invalid identifier format. Use alphanumeric characters and hyphens.');
+    }
+
     // Check if table identifier already exists
-    const existing = await RestaurantTableRepository.findByIdentifier(req.params.tenantId, identifier);
+    const existing = await RestaurantTableRepository.findByIdentifier(req.params.tenantId, sanitizedIdentifier);
     if (existing) {
       return errorResponse(res, 409, 'Table with this identifier already exists');
     }
@@ -68,11 +76,11 @@ router.post('/:tenantId/tables', authenticateToken, authorizeRestaurantAdmin, ve
       return errorResponse(res, 404, 'Restaurant not found');
     }
 
-    const qrUrl = generateQRUrl(tenant.slug, identifier);
+    const qrUrl = generateQRUrl(tenant.slug, sanitizedIdentifier);
     const tableId = await RestaurantTableRepository.create({
       tenant_id: req.params.tenantId,
       name,
-      identifier,
+      identifier: sanitizedIdentifier,
       qr_url: qrUrl
     });
 
@@ -97,14 +105,21 @@ router.put('/:tenantId/tables/:tableId', authenticateToken, authorizeRestaurantA
     if (is_active !== undefined) updates.is_active = is_active;
 
     if (identifier && identifier !== table.identifier) {
-      const existing = await RestaurantTableRepository.findByIdentifier(req.params.tenantId, identifier);
+      // Sanitize the new identifier
+      const sanitizedIdentifier = sanitizeTableIdentifier(identifier);
+      
+      if (!sanitizedIdentifier) {
+        return errorResponse(res, 400, 'Invalid identifier format. Use alphanumeric characters and hyphens.');
+      }
+
+      const existing = await RestaurantTableRepository.findByIdentifier(req.params.tenantId, sanitizedIdentifier);
       if (existing) {
         return errorResponse(res, 409, 'Table with this identifier already exists');
       }
-      updates.identifier = identifier;
+      updates.identifier = sanitizedIdentifier;
 
       const tenant = await TenantRepository.findById(req.params.tenantId);
-      updates.qr_url = generateQRUrl(tenant.slug, identifier);
+      updates.qr_url = generateQRUrl(tenant.slug, sanitizedIdentifier);
     }
 
     await RestaurantTableRepository.updateById(req.params.tableId, updates);
