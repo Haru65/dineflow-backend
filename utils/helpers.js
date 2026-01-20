@@ -12,8 +12,10 @@ const generateSlug = (name) => {
 };
 
 const generateQRUrl = (restaurantSlug, tableIdentifier) => {
-  const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
-  return `${baseUrl}/order/${restaurantSlug}/${tableIdentifier}`;
+  // Use FRONTEND_URL for QR codes (customer-facing)
+  // Fall back to BASE_URL for backwards compatibility, then localhost
+  const frontendUrl = process.env.FRONTEND_URL || process.env.BASE_URL || 'http://localhost:5173';
+  return `${frontendUrl}/order/${restaurantSlug}/${tableIdentifier}`;
 };
 
 const validateEmail = (email) => {
