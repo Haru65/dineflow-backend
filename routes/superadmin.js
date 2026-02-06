@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const TenantRepository = require('../repositories/TenantRepository');
 const UserRepository = require('../repositories/UserRepository');
+const { dbGet, dbRun, dbAll } = require('../database');
 const {
   authenticateToken,
   authorizeSuperadmin,
@@ -159,7 +160,7 @@ router.put('/tenants/:id', authenticateToken, authorizeSuperadmin, async (req, r
   }
 });
 
-// Delete tenant (caution: cascades)
+// Delete tenant (soft delete - deactivates instead of removing)
 router.delete('/tenants/:id', authenticateToken, authorizeSuperadmin, async (req, res) => {
   try {
     const tenant = await TenantRepository.findById(req.params.id);
@@ -168,9 +169,42 @@ router.delete('/tenants/:id', authenticateToken, authorizeSuperadmin, async (req
     }
 
     await TenantRepository.deleteById(req.params.id);
-    successResponse(res, 200, { id: req.params.id }, 'Tenant deleted successfully');
+    successResponse(res, 200, { id: req.params.id }, 'Tenant deactivated successfully (soft delete)');
   } catch (error) {
     console.error('Delete tenant error:', error);
+    errorResponse(res, 500, 'Internal server error', error.message);
+  }
+});
+
+// Restore tenant (reactivate soft-deleted tenant)
+router.post('/tenants/:id/restore', authenticateToken, authorizeSuperadmin, async (req, res) => {
+  try {
+    // Check if tenant exists (including inactive ones)
+    const tenant = await dbGet('SELECT * FROM tenants WHERE id = ?', [req.params.id]);
+    if (!tenant) {
+      return errorResponse(res, 404, 'Tenant not found');
+    }
+
+    if (tenant.is_active) {
+      return errorResponse(res, 400, 'Tenant is already active');
+    }
+
+    // Restore tenant
+    await dbRun('UPDATE tenants SET is_active = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [req.params.id]);
+    successResponse(res, 200, { id: req.params.id }, 'Tenant restored successfully');
+  } catch (error) {
+    console.error('Restore tenant error:', error);
+    errorResponse(res, 500, 'Internal server error', error.message);
+  }
+});
+
+// Get all tenants including inactive ones (for superadmin)
+router.get('/tenants/all', authenticateToken, authorizeSuperadmin, async (req, res) => {
+  try {
+    const tenants = await dbAll('SELECT * FROM tenants ORDER BY created_at DESC');
+    successResponse(res, 200, tenants);
+  } catch (error) {
+    console.error('Get all tenants error:', error);
     errorResponse(res, 500, 'Internal server error', error.message);
   }
 });
