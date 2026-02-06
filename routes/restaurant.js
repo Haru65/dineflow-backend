@@ -21,6 +21,7 @@ const OrderItemRepository = require('../repositories/OrderItemRepository');
 const PaymentProviderRepository = require('../repositories/PaymentProviderRepository');
 const IntegrationRepository = require('../repositories/IntegrationRepository');
 const EmailConfigRepository = require('../repositories/EmailConfigRepository');
+const ReportsRepository = require('../repositories/ReportsRepository');
 const EmailService = require('../utils/emailService');
 
 // Middleware to verify tenant access
@@ -833,6 +834,80 @@ router.get('/:tenantId/dashboard/metrics', authenticateToken, authorizeRestauran
     });
   } catch (error) {
     console.error('Dashboard metrics error:', error);
+    errorResponse(res, 500, 'Internal server error', error.message);
+  }
+});
+
+// ===================== REPORTS =====================
+
+// Get revenue report
+router.get('/:tenantId/reports/revenue', authenticateToken, authorizeRestaurantAdmin, verifyTenantAccess, async (req, res) => {
+  try {
+    const { period = 'daily', startDate, endDate } = req.query;
+
+    if (!startDate || !endDate) {
+      return errorResponse(res, 400, 'Start date and end date are required');
+    }
+
+    const report = await ReportsRepository.getRevenueReport(
+      req.params.tenantId,
+      period,
+      startDate,
+      endDate
+    );
+
+    successResponse(res, 200, report);
+  } catch (error) {
+    console.error('Get revenue report error:', error);
+    errorResponse(res, 500, 'Internal server error', error.message);
+  }
+});
+
+// Get order report
+router.get('/:tenantId/reports/orders', authenticateToken, authorizeRestaurantAdmin, verifyTenantAccess, async (req, res) => {
+  try {
+    const { startDate, endDate, source_type, status } = req.query;
+
+    if (!startDate || !endDate) {
+      return errorResponse(res, 400, 'Start date and end date are required');
+    }
+
+    const filters = {};
+    if (source_type) filters.source_type = source_type;
+    if (status) filters.status = status;
+
+    const report = await ReportsRepository.getOrderReport(
+      req.params.tenantId,
+      startDate,
+      endDate,
+      filters
+    );
+
+    successResponse(res, 200, report);
+  } catch (error) {
+    console.error('Get order report error:', error);
+    errorResponse(res, 500, 'Internal server error', error.message);
+  }
+});
+
+// Get product report
+router.get('/:tenantId/reports/products', authenticateToken, authorizeRestaurantAdmin, verifyTenantAccess, async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    if (!startDate || !endDate) {
+      return errorResponse(res, 400, 'Start date and end date are required');
+    }
+
+    const report = await ReportsRepository.getProductReport(
+      req.params.tenantId,
+      startDate,
+      endDate
+    );
+
+    successResponse(res, 200, report);
+  } catch (error) {
+    console.error('Get product report error:', error);
     errorResponse(res, 500, 'Internal server error', error.message);
   }
 });
