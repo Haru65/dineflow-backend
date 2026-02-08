@@ -327,6 +327,44 @@ router.get('/order/:restaurantSlug/:orderId', async (req, res) => {
   }
 });
 
+// Update order notes (for public access)
+router.patch('/order/:restaurantSlug/:orderId', async (req, res) => {
+  try {
+    const { restaurantSlug, orderId } = req.params;
+    const { notes } = req.body;
+
+    if (notes === undefined) {
+      return errorResponse(res, 400, 'Notes field is required');
+    }
+
+    const order = await OrderRepository.findById(orderId);
+    if (!order) {
+      return errorResponse(res, 404, 'Order not found');
+    }
+
+    const tenant = await TenantRepository.findBySlug(restaurantSlug);
+    if (!tenant || tenant.id !== order.tenant_id) {
+      return errorResponse(res, 404, 'Restaurant not found or order mismatch');
+    }
+
+    // Update order notes
+    await OrderRepository.updateById(orderId, { notes });
+
+    const updatedOrder = await OrderRepository.findById(orderId);
+    const items = await OrderItemRepository.findByOrder(orderId);
+
+    successResponse(res, 200, {
+      ...updatedOrder,
+      created_at: formatTimestamp(updatedOrder.created_at),
+      updated_at: formatTimestamp(updatedOrder.updated_at),
+      items
+    }, 'Order notes updated successfully');
+  } catch (error) {
+    console.error('Update order notes error:', error);
+    errorResponse(res, 500, 'Internal server error', error.message);
+  }
+});
+
 // Razorpay webhook endpoint
 router.post('/payment/webhook', async (req, res) => {
   try {

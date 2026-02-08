@@ -16,15 +16,15 @@ class TenantRepository {
   }
 
   async findById(id) {
-    return dbGet('SELECT * FROM tenants WHERE id = ? AND is_active = 1', [id]);
+    return dbGet('SELECT * FROM tenants WHERE id = ?', [id]);
   }
 
   async findBySlug(slug) {
-    return dbGet('SELECT * FROM tenants WHERE slug = ? AND is_active = 1', [slug]);
+    return dbGet('SELECT * FROM tenants WHERE slug = ?', [slug]);
   }
 
   async findAll() {
-    return dbAll('SELECT * FROM tenants WHERE is_active = 1 ORDER BY created_at DESC');
+    return dbAll('SELECT * FROM tenants ORDER BY created_at DESC');
   }
 
   async updateById(id, updates) {
@@ -40,12 +40,6 @@ class TenantRepository {
   }
 
   async deleteById(id) {
-    // Soft delete - set is_active to 0 instead of hard delete
-    await dbRun('UPDATE tenants SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [id]);
-  }
-
-  async hardDeleteById(id) {
-    // Hard delete - only use in extreme cases
     await dbRun('DELETE FROM tenants WHERE id = ?', [id]);
   }
 }
