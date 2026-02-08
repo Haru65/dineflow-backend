@@ -46,7 +46,6 @@ const runMigrations = () => {
           slug TEXT UNIQUE NOT NULL,
           address TEXT,
           contact_phone TEXT,
-          is_active INTEGER DEFAULT 1,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
