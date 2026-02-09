@@ -50,13 +50,14 @@ app.use((req, res) => {
 
 // Initialize database and start server
 const PORT = process.env.PORT || 3000;
+const { closeDatabase } = require('./database');
 
 async function start() {
   try {
     await initializeDatabase();
     console.log('Database initialized');
 
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
       console.log(`\n🚀 DineFlow Backend running on http://localhost:${PORT}`);
       console.log('\nAvailable routes:');
       console.log('  Authentication: POST /auth/login, POST /auth/init-superadmin, GET /auth/me');
@@ -65,6 +66,26 @@ async function start() {
       console.log('  Public: GET /api/public/menu/:restaurantSlug/:tableIdentifier, POST /api/public/order, POST /api/public/payment/create-order, etc.');
       console.log('\n');
     });
+
+    // Graceful shutdown handler
+    const gracefulShutdown = async (signal) => {
+      console.log(`\n${signal} signal received: closing HTTP server`);
+      server.close(async () => {
+        console.log('HTTP server closed');
+        try {
+          await closeDatabase();
+          console.log('Database connection closed');
+          process.exit(0);
+        } catch (err) {
+          console.error('Error closing database:', err);
+          process.exit(1);
+        }
+      });
+    };
+
+    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
   } catch (error) {
     console.error('Failed to start server:', error);
     process.exit(1);

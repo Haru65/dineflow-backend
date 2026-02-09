@@ -37,208 +37,253 @@ const initializeDatabase = () => {
 
 const runMigrations = () => {
   return new Promise((resolve, reject) => {
-    db.serialize(() => {
-      // Tenants table
-      db.run(`
-        CREATE TABLE IF NOT EXISTS tenants (
-          id TEXT PRIMARY KEY,
-          name TEXT NOT NULL,
-          slug TEXT UNIQUE NOT NULL,
-          address TEXT,
-          contact_phone TEXT,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-      `, (err) => { if (err) reject(err); });
+    // Enable foreign keys and ensure persistent mode
+    db.run('PRAGMA foreign_keys = ON', (err) => {
+      if (err) return reject(err);
 
-      // Users table
-      db.run(`
-        CREATE TABLE IF NOT EXISTS users (
-          id TEXT PRIMARY KEY,
-          tenant_id TEXT,
-          email TEXT UNIQUE NOT NULL,
-          password_hash TEXT NOT NULL,
-          name TEXT NOT NULL,
-          role TEXT DEFAULT 'restaurant_admin',
-          is_active INTEGER DEFAULT 1,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
-          CHECK (role IN ('superadmin', 'restaurant_admin', 'kitchen_staff', 'cashier'))
-        )
-      `, (err) => { if (err) reject(err); });
+      db.serialize(() => {
+        let migrationCount = 0;
+        let completedCount = 0;
+        const migrationCheckInterval = setInterval(() => {}, 1000); // Keep process alive
 
-      // Restaurant tables
-      db.run(`
-        CREATE TABLE IF NOT EXISTS restaurant_tables (
-          id TEXT PRIMARY KEY,
-          tenant_id TEXT NOT NULL,
-          name TEXT NOT NULL,
-          identifier TEXT NOT NULL,
-          qr_url TEXT,
-          is_active INTEGER DEFAULT 1,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
-          UNIQUE (tenant_id, identifier)
-        )
-      `, (err) => { if (err) reject(err); });
+        const checkMigrationComplete = () => {
+          completedCount++;
+          if (completedCount === migrationCount) {
+            clearInterval(migrationCheckInterval);
+            // Final checkpoint to ensure all data is written to disk
+            db.run('PRAGMA optimize', () => {
+              resolve();
+            });
+          }
+        };
 
-      // Menu categories
-      db.run(`
-        CREATE TABLE IF NOT EXISTS menu_categories (
-          id TEXT PRIMARY KEY,
-          tenant_id TEXT NOT NULL,
-          name TEXT NOT NULL,
-          sort_order INTEGER DEFAULT 0,
-          is_active INTEGER DEFAULT 1,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
-        )
-      `, (err) => { if (err) reject(err); });
+        // Track total operations
+        migrationCount = 22; // 8 tables + 13 indexes + 1 pragma + checkpoint
 
-      // Menu items
-      db.run(`
-        CREATE TABLE IF NOT EXISTS menu_items (
-          id TEXT PRIMARY KEY,
-          tenant_id TEXT NOT NULL,
-          category_id TEXT NOT NULL,
-          name TEXT NOT NULL,
-          description TEXT,
-          price REAL NOT NULL,
-          is_available INTEGER DEFAULT 1,
-          is_veg INTEGER DEFAULT 1,
-          is_spicy INTEGER DEFAULT 0,
-          tags TEXT DEFAULT '',
-          preparation_time INTEGER,
-          image_url TEXT,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
-          FOREIGN KEY (category_id) REFERENCES menu_categories(id) ON DELETE CASCADE
-        )
-      `, (err) => { if (err) reject(err); });
+        // Tenants table
+        db.run(`
+          CREATE TABLE IF NOT EXISTS tenants (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            slug TEXT UNIQUE NOT NULL,
+            address TEXT,
+            contact_phone TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          )
+        `, (err) => {
+          if (err) reject(err);
+          checkMigrationComplete();
+        });
 
-      // Orders
-      db.run(`
-        CREATE TABLE IF NOT EXISTS orders (
-          id TEXT PRIMARY KEY,
-          tenant_id TEXT NOT NULL,
-          table_id TEXT,
-          source_type TEXT NOT NULL,
-          source_reference TEXT,
-          status TEXT DEFAULT 'pending',
-          payment_status TEXT DEFAULT 'pending',
-          payment_provider TEXT,
-          payment_order_id TEXT,
-          payment_id TEXT,
-          total_amount REAL,
-          tax_amount REAL DEFAULT 0,
-          discount_amount REAL DEFAULT 0,
-          notes TEXT,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
-          FOREIGN KEY (table_id) REFERENCES restaurant_tables(id) ON DELETE SET NULL,
-          CHECK (status IN ('pending', 'confirmed', 'cooking', 'ready', 'served', 'cancelled')),
-          CHECK (payment_status IN ('pending', 'completed', 'failed', 'refunded'))
-        )
-      `, (err) => { if (err) reject(err); });
+        // Users table
+        db.run(`
+          CREATE TABLE IF NOT EXISTS users (
+            id TEXT PRIMARY KEY,
+            tenant_id TEXT,
+            email TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            name TEXT NOT NULL,
+            role TEXT DEFAULT 'restaurant_admin',
+            is_active INTEGER DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
+            CHECK (role IN ('superadmin', 'restaurant_admin', 'kitchen_staff', 'cashier'))
+          )
+        `, (err) => {
+          if (err) reject(err);
+          checkMigrationComplete();
+        });
 
-      // Order items
-      db.run(`
-        CREATE TABLE IF NOT EXISTS order_items (
-          id TEXT PRIMARY KEY,
-          order_id TEXT NOT NULL,
-          menu_item_id TEXT,
-          name_snapshot TEXT NOT NULL,
-          price_snapshot REAL NOT NULL,
-          quantity INTEGER NOT NULL,
-          status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'ready', 'completed', 'cancelled')),
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
-          FOREIGN KEY (menu_item_id) REFERENCES menu_items(id) ON DELETE SET NULL
-        )
-      `, (err) => { if (err) reject(err); });
+        // Restaurant tables
+        db.run(`
+          CREATE TABLE IF NOT EXISTS restaurant_tables (
+            id TEXT PRIMARY KEY,
+            tenant_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            identifier TEXT NOT NULL,
+            qr_url TEXT,
+            is_active INTEGER DEFAULT 1,
+            current_status TEXT DEFAULT 'available',
+            active_orders_count INTEGER DEFAULT 0,
+            last_order_time DATETIME,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
+            UNIQUE (tenant_id, identifier)
+          )
+        `, (err) => {
+          if (err) reject(err);
+          checkMigrationComplete();
+        });
 
-      // Payment providers
-      db.run(`
-        CREATE TABLE IF NOT EXISTS payment_providers (
-          id TEXT PRIMARY KEY,
-          tenant_id TEXT NOT NULL,
-          provider TEXT NOT NULL,
-          key_id TEXT NOT NULL,
-          key_secret TEXT NOT NULL,
-          webhook_secret TEXT,
-          is_active INTEGER DEFAULT 1,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
-          UNIQUE (tenant_id, provider)
-        )
-      `, (err) => { if (err) reject(err); });
+        // Menu categories
+        db.run(`
+          CREATE TABLE IF NOT EXISTS menu_categories (
+            id TEXT PRIMARY KEY,
+            tenant_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            sort_order INTEGER DEFAULT 0,
+            is_active INTEGER DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
+          )
+        `, (err) => {
+          if (err) reject(err);
+          checkMigrationComplete();
+        });
 
-      // Integrations (Zomato/Swiggy)
-      db.run(`
-        CREATE TABLE IF NOT EXISTS integrations (
-          id TEXT PRIMARY KEY,
-          tenant_id TEXT NOT NULL,
-          provider TEXT NOT NULL,
-          webhook_url TEXT,
-          soapie_url TEXT,
-          api_key TEXT,
-          is_active INTEGER DEFAULT 1,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
-          UNIQUE (tenant_id, provider)
-        )
-      `, (err) => { if (err) reject(err); });
+        // Menu items
+        db.run(`
+          CREATE TABLE IF NOT EXISTS menu_items (
+            id TEXT PRIMARY KEY,
+            tenant_id TEXT NOT NULL,
+            category_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            description TEXT,
+            price REAL NOT NULL,
+            is_available INTEGER DEFAULT 1,
+            is_veg INTEGER DEFAULT 1,
+            is_spicy INTEGER DEFAULT 0,
+            tags TEXT DEFAULT '',
+            preparation_time INTEGER,
+            image_url TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
+            FOREIGN KEY (category_id) REFERENCES menu_categories(id) ON DELETE CASCADE
+          )
+        `, (err) => {
+          if (err) reject(err);
+          checkMigrationComplete();
+        });
 
-      // Create indexes
-      db.run(`CREATE INDEX IF NOT EXISTS idx_users_tenant_id ON users(tenant_id)`, (err) => { if (err) reject(err); });
-      db.run(`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`, (err) => { if (err) reject(err); });
-      db.run(`CREATE INDEX IF NOT EXISTS idx_tables_tenant_id ON restaurant_tables(tenant_id)`, (err) => { if (err) reject(err); });
-      db.run(`CREATE INDEX IF NOT EXISTS idx_categories_tenant_id ON menu_categories(tenant_id)`, (err) => { if (err) reject(err); });
-      db.run(`CREATE INDEX IF NOT EXISTS idx_items_tenant_id ON menu_items(tenant_id)`, (err) => { if (err) reject(err); });
-      db.run(`CREATE INDEX IF NOT EXISTS idx_items_category_id ON menu_items(category_id)`, (err) => { if (err) reject(err); });
-      db.run(`CREATE INDEX IF NOT EXISTS idx_orders_tenant_id ON orders(tenant_id)`, (err) => { if (err) reject(err); });
-      db.run(`CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)`, (err) => { if (err) reject(err); });
-      db.run(`CREATE INDEX IF NOT EXISTS idx_orders_payment_status ON orders(payment_status)`, (err) => { if (err) reject(err); });
-      db.run(`CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id)`, (err) => { if (err) reject(err); });
-      db.run(`CREATE INDEX IF NOT EXISTS idx_payment_tenant_id ON payment_providers(tenant_id)`, (err) => { if (err) reject(err); });
-      db.run(`CREATE INDEX IF NOT EXISTS idx_payment_provider ON payment_providers(provider)`, (err) => { if (err) reject(err); });
-      db.run(`CREATE INDEX IF NOT EXISTS idx_integrations_tenant_id ON integrations(tenant_id)`, (err) => { if (err) reject(err); });
-      
-      // Add missing columns to existing menu_items table
-      db.all("PRAGMA table_info(menu_items)", (err, columns) => {
-        if (!err && columns) {
-          const columnNames = columns.map(col => col.name);
-          const columnsToAdd = [
-            { name: 'is_veg', sql: 'ALTER TABLE menu_items ADD COLUMN is_veg INTEGER DEFAULT 1' },
-            { name: 'is_spicy', sql: 'ALTER TABLE menu_items ADD COLUMN is_spicy INTEGER DEFAULT 0' },
-            { name: 'tags', sql: "ALTER TABLE menu_items ADD COLUMN tags TEXT DEFAULT ''" },
-            { name: 'preparation_time', sql: 'ALTER TABLE menu_items ADD COLUMN preparation_time INTEGER' }
-          ];
+        // Orders
+        db.run(`
+          CREATE TABLE IF NOT EXISTS orders (
+            id TEXT PRIMARY KEY,
+            tenant_id TEXT NOT NULL,
+            table_id TEXT,
+            source_type TEXT NOT NULL,
+            source_reference TEXT,
+            status TEXT DEFAULT 'pending',
+            payment_status TEXT DEFAULT 'pending',
+            payment_provider TEXT,
+            payment_order_id TEXT,
+            payment_id TEXT,
+            total_amount REAL,
+            tax_amount REAL DEFAULT 0,
+            discount_amount REAL DEFAULT 0,
+            notes TEXT,
+            status_changed_at DATETIME,
+            aging_level TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
+            FOREIGN KEY (table_id) REFERENCES restaurant_tables(id) ON DELETE SET NULL,
+            CHECK (status IN ('pending', 'confirmed', 'cooking', 'ready', 'served', 'cancelled')),
+            CHECK (payment_status IN ('pending', 'completed', 'failed', 'refunded'))
+          )
+        `, (err) => {
+          if (err) reject(err);
+          checkMigrationComplete();
+        });
 
-          let pendingOperations = 0;
-          columnsToAdd.forEach(col => {
-            if (!columnNames.includes(col.name)) {
-              pendingOperations++;
-              db.run(col.sql, (err) => {
-                pendingOperations--;
-                if (!err) {
-                  console.log(`✓ Added column ${col.name} to menu_items table`);
-                }
-              });
-            }
-          });
-        }
-      });
-      
-      db.run(`CREATE INDEX IF NOT EXISTS idx_integrations_provider ON integrations(provider)`, () => {
-        resolve();
+        // Order items
+        db.run(`
+          CREATE TABLE IF NOT EXISTS order_items (
+            id TEXT PRIMARY KEY,
+            order_id TEXT NOT NULL,
+            menu_item_id TEXT,
+            name_snapshot TEXT NOT NULL,
+            price_snapshot REAL NOT NULL,
+            quantity INTEGER NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'ready', 'completed', 'cancelled')),
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+            FOREIGN KEY (menu_item_id) REFERENCES menu_items(id) ON DELETE SET NULL
+          )
+        `, (err) => {
+          if (err) reject(err);
+          checkMigrationComplete();
+        });
+
+        // Payment providers
+        db.run(`
+          CREATE TABLE IF NOT EXISTS payment_providers (
+            id TEXT PRIMARY KEY,
+            tenant_id TEXT NOT NULL,
+            provider TEXT NOT NULL,
+            key_id TEXT NOT NULL,
+            key_secret TEXT NOT NULL,
+            webhook_secret TEXT,
+            is_active INTEGER DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
+            UNIQUE (tenant_id, provider)
+          )
+        `, (err) => {
+          if (err) reject(err);
+          checkMigrationComplete();
+        });
+
+        // Create indexes
+        db.run(`CREATE INDEX IF NOT EXISTS idx_users_tenant_id ON users(tenant_id)`, (err) => {
+          if (err) reject(err);
+          checkMigrationComplete();
+        });
+        db.run(`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`, (err) => {
+          if (err) reject(err);
+          checkMigrationComplete();
+        });
+        db.run(`CREATE INDEX IF NOT EXISTS idx_tables_tenant_id ON restaurant_tables(tenant_id)`, (err) => {
+          if (err) reject(err);
+          checkMigrationComplete();
+        });
+        db.run(`CREATE INDEX IF NOT EXISTS idx_categories_tenant_id ON menu_categories(tenant_id)`, (err) => {
+          if (err) reject(err);
+          checkMigrationComplete();
+        });
+        db.run(`CREATE INDEX IF NOT EXISTS idx_items_tenant_id ON menu_items(tenant_id)`, (err) => {
+          if (err) reject(err);
+          checkMigrationComplete();
+        });
+        db.run(`CREATE INDEX IF NOT EXISTS idx_items_category_id ON menu_items(category_id)`, (err) => {
+          if (err) reject(err);
+          checkMigrationComplete();
+        });
+        db.run(`CREATE INDEX IF NOT EXISTS idx_orders_tenant_id ON orders(tenant_id)`, (err) => {
+          if (err) reject(err);
+          checkMigrationComplete();
+        });
+        db.run(`CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)`, (err) => {
+          if (err) reject(err);
+          checkMigrationComplete();
+        });
+        db.run(`CREATE INDEX IF NOT EXISTS idx_orders_payment_status ON orders(payment_status)`, (err) => {
+          if (err) reject(err);
+          checkMigrationComplete();
+        });
+        db.run(`CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id)`, (err) => {
+          if (err) reject(err);
+          checkMigrationComplete();
+        });
+        db.run(`CREATE INDEX IF NOT EXISTS idx_payment_tenant_id ON payment_providers(tenant_id)`, (err) => {
+          if (err) reject(err);
+          checkMigrationComplete();
+        });
+        db.run(`CREATE INDEX IF NOT EXISTS idx_payment_provider ON payment_providers(provider)`, (err) => {
+          if (err) reject(err);
+          checkMigrationComplete();
+        });
+        db.run(`CREATE INDEX IF NOT EXISTS idx_integrations_tenant_id ON integrations(tenant_id)`, (err) => {
+          if (err) reject(err);
+          checkMigrationComplete();
+        });
       });
     });
   });
