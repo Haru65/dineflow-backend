@@ -28,7 +28,7 @@ class OrderItemRepository {
     return dbAll(
       `SELECT 
         oi.id, oi.order_id, oi.menu_item_id, oi.name_snapshot, 
-        oi.price_snapshot, oi.quantity, oi.status,
+        oi.price_snapshot, oi.quantity, oi.status, oi.notes,
         mi.is_veg, mi.is_spicy
       FROM order_items oi
       LEFT JOIN menu_items mi ON oi.menu_item_id = mi.id

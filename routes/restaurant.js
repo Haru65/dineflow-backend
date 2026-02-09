@@ -494,18 +494,30 @@ router.put('/:tenantId/orders/:orderId/items/:itemId', authenticateToken, author
       return errorResponse(res, 404, 'Order not found');
     }
 
-    const { status } = req.body;
+    const { status, notes } = req.body;
 
-    if (!status) {
-      return errorResponse(res, 400, 'Status is required');
+    // Build the update object
+    const updates = {};
+    
+    if (status) {
+      if (!['pending', 'ready', 'completed', 'cancelled'].includes(status)) {
+        return errorResponse(res, 400, 'Invalid status');
+      }
+      updates.status = status;
     }
 
-    if (!['pending', 'ready', 'completed', 'cancelled'].includes(status)) {
-      return errorResponse(res, 400, 'Invalid status');
+    if (notes !== undefined) {
+      // notes can be empty string or any text, but cap at 500 characters
+      const sanitizedNotes = notes ? notes.substring(0, 500) : null;
+      updates.notes = sanitizedNotes;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return errorResponse(res, 400, 'Either status or notes is required');
     }
 
     // Update the order item
-    await OrderItemRepository.updateById(req.params.itemId, { status });
+    await OrderItemRepository.updateById(req.params.itemId, updates);
     
     // Fetch updated order with items
     const items = await OrderItemRepository.findByOrder(req.params.orderId);
