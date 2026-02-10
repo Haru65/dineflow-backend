@@ -201,6 +201,7 @@ const runMigrations = () => {
             price_snapshot REAL NOT NULL,
             quantity INTEGER NOT NULL,
             status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'ready', 'completed', 'cancelled')),
+            notes TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
