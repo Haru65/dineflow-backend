@@ -406,6 +406,7 @@ router.get('/:tenantId/orders', authenticateToken, authorizeRestaurantAdmin, ver
           price_snapshot: item.price_snapshot,
           quantity: item.quantity,
           status: item.status,
+          notes: item.notes || null,
           menuItem: {
             name: item.name_snapshot,
             isVeg: item.is_veg ? true : false,
@@ -439,6 +440,7 @@ router.get('/:tenantId/orders/:orderId', authenticateToken, authorizeRestaurantA
       price_snapshot: item.price_snapshot,
       quantity: item.quantity,
       status: item.status,
+      notes: item.notes || null,
       menuItem: {
         name: item.name_snapshot,
         isVeg: item.is_veg ? true : false,
