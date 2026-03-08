@@ -4,7 +4,6 @@
  */
 
 const axios = require('axios');
-const PaytmChecksum = require('paytmchecksum');
 const crypto = require('crypto');
 
 // Paytm endpoints
@@ -32,6 +31,43 @@ class PaytmService {
     // Validate required environment variables
     if (!this.mid || !this.merchantKey || !this.website) {
       console.warn('⚠️  Warning: Paytm environment variables not fully configured');
+    }
+  }
+
+  /**
+   * Generate checksum using HMAC-SHA256
+   * @param {string} data - Data to sign
+   * @param {string} key - Merchant key
+   * @returns {string} Checksum hash
+   */
+  generateChecksum(data, key) {
+    try {
+      const hash = crypto
+        .createHmac('sha256', key)
+        .update(data)
+        .digest('base64');
+      return hash;
+    } catch (error) {
+      console.error('Error generating checksum:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Verify checksum
+   * @param {string} data - Original data
+   * @param {string} receivedHash - Hash to verify against
+   * @param {string} key - Merchant key
+   * @returns {boolean} True if checksum is valid
+   */
+  verifyChecksum(data, receivedHash, key) {
+    try {
+      const calculatedHash = this.generateChecksum(data, key);
+      const isValid = calculatedHash === receivedHash;
+      return isValid;
+    } catch (error) {
+      console.error('Error verifying checksum:', error.message);
+      return false;
     }
   }
 
@@ -67,8 +103,13 @@ class PaytmService {
         throw new Error('Missing required fields: orderId, amount, customerId');
       }
 
+      // Validate amount
+      if (isNaN(amount) || amount <= 0) {
+        throw new Error('Invalid amount. Must be a positive number.');
+      }
+
       // Amount in paisa (multiply by 100)
-      const amountInPaisa = Math.round(amount * 100);
+      const amountInPaisa = Math.round(amount * 100).toString();
 
       // Prepare transaction object
       const paytmParams = {
@@ -78,7 +119,7 @@ class PaytmService {
         CUST_ID: customerId,
         MOBILE_NO: customerPhoneNumber || '',
         EMAIL: customerEmail || '',
-        TXN_AMOUNT: amountInPaisa.toString(),
+        TXN_AMOUNT: amountInPaisa,
         INDUSTRY_TYPE_ID: this.industryType,
         CHANNEL_ID: this.channelId,
         CALLBACK_URL: this.callbackUrl,
@@ -89,11 +130,11 @@ class PaytmService {
         })
       };
 
-      // Generate checksum
-      const checksum = await PaytmChecksum.generateSignature(
-        JSON.stringify(paytmParams),
-        this.merchantKey
-      );
+      // Create string representation for checksum (specific Paytm format)
+      const checksumString = JSON.stringify(paytmParams);
+
+      // Generate checksum using HMAC-SHA256
+      const checksum = this.generateChecksum(checksumString, this.merchantKey);
 
       console.log(`📝 Paytm order created: ${orderId}`);
 
@@ -120,38 +161,6 @@ class PaytmService {
   }
 
   /**
-   * Verify payment checksum from Paytm callback
-   * @param {Object} paytmResponse - Response from Paytm
-   * @returns {Promise<boolean>} True if checksum is valid
-   */
-  async verifyChecksum(paytmResponse) {
-    try {
-      const {
-        CHECKSUMHASH,
-        ...paytmParams
-      } = paytmResponse;
-
-      // Verify checksum
-      const isValidChecksum = await PaytmChecksum.verifySignature(
-        JSON.stringify(paytmParams),
-        this.merchantKey,
-        CHECKSUMHASH
-      );
-
-      if (!isValidChecksum) {
-        console.error('❌ Invalid Paytm checksum');
-        return false;
-      }
-
-      console.log('✅ Paytm checksum verified successfully');
-      return true;
-    } catch (error) {
-      console.error('❌ Error verifying Paytm checksum:', error.message);
-      return false;
-    }
-  }
-
-  /**
    * Check transaction status from Paytm
    * @param {string} orderId - Order ID
    * @returns {Promise<Object>} Transaction status details
@@ -165,10 +174,8 @@ class PaytmService {
       };
 
       // Generate checksum for verification request
-      const checksum = await PaytmChecksum.generateSignature(
-        JSON.stringify(verifyParams),
-        this.merchantKey
-      );
+      const checksumString = JSON.stringify(verifyParams);
+      const checksum = this.generateChecksum(checksumString, this.merchantKey);
 
       verifyParams.CHECKSUMHASH = checksum;
 
@@ -218,11 +225,17 @@ class PaytmService {
   }
 
   /**
-   * Parse Paytm callback response
+   * Parse and verify Paytm callback response
    * @param {Object} callbackData - Data from Paytm callback
-   * @returns {Object} Parsed response with status
+   * @returns {Object} Parsed response with verification status
    */
   parseCallbackResponse(callbackData) {
+    const { CHECKSUMHASH, ...paytmResponse } = callbackData;
+
+    // Verify checksum
+    const checksumString = JSON.stringify(paytmResponse);
+    const isValidChecksum = this.verifyChecksum(checksumString, CHECKSUMHASH, this.merchantKey);
+
     const extractedData = {
       orderId: callbackData.ORDERID,
       txnId: callbackData.TXNID,
@@ -235,7 +248,8 @@ class PaytmService {
       txnDate: callbackData.TXNDATE,
       gatewayName: callbackData.GATEWAYNAME,
       checksumHash: callbackData.CHECKSUMHASH,
-      isSuccess: callbackData.STATUS === 'TXN_SUCCESS'
+      isSuccess: callbackData.STATUS === 'TXN_SUCCESS',
+      checksumValid: isValidChecksum
     };
 
     return extractedData;
