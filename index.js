@@ -59,8 +59,8 @@ async function start() {
     await initializeDatabase();
     console.log('Database initialized');
 
-    const server = app.listen(PORT, () => {
-      console.log(`\n🚀 DineFlow Backend running on http://localhost:${PORT}`);
+    const server = app.listen(PORT, '0.0.0.0', () => {
+      console.log(`\n🚀 DineFlow Backend running on http://0.0.0.0:${PORT}`);
       console.log('\nAvailable routes:');
       console.log('  Authentication: POST /auth/login, POST /auth/init-superadmin, GET /auth/me');
       console.log('  Superadmin: GET /admin/superadmin/tenants, POST /admin/superadmin/tenants, etc.');
