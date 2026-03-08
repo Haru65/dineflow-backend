@@ -133,10 +133,10 @@ router.post('/callback', async (req, res) => {
     console.log(`   Order ID: ${callbackData.ORDERID}`);
     console.log(`   Status: ${callbackData.STATUS}`);
 
-    // Verify checksum
-    const isValidChecksum = await paytmService.verifyChecksum(callbackData);
+    // Parse and verify checksum
+    const parsedResponse = paytmService.parseCallbackResponse(callbackData);
 
-    if (!isValidChecksum) {
+    if (!parsedResponse.checksumValid) {
       console.error('❌ Checksum verification failed for order:', callbackData.ORDERID);
       
       // Still update database to mark as suspicious
@@ -157,9 +157,6 @@ router.post('/callback', async (req, res) => {
         orderId: callbackData.ORDERID
       });
     }
-
-    // Parse the callback response
-    const parsedResponse = paytmService.parseCallbackResponse(callbackData);
 
     console.log(`✅ Checksum verified`);
     console.log(`   Transaction ID: ${parsedResponse.txnId}`);
