@@ -56,17 +56,24 @@ const { closeDatabase } = require('./database');
 
 async function start() {
   try {
+    console.log(`Starting DineFlow Backend on port ${PORT}...`);
     await initializeDatabase();
-    console.log('Database initialized');
+    console.log('Database initialized successfully');
 
     const server = app.listen(PORT, '0.0.0.0', () => {
-      console.log(`\n🚀 DineFlow Backend running on http://0.0.0.0:${PORT}`);
+      console.log(`\n✅ SERVER LISTENING on 0.0.0.0:${PORT}`);
+      console.log(`🚀 DineFlow Backend running on port ${PORT}`);
       console.log('\nAvailable routes:');
       console.log('  Authentication: POST /auth/login, POST /auth/init-superadmin, GET /auth/me');
       console.log('  Superadmin: GET /admin/superadmin/tenants, POST /admin/superadmin/tenants, etc.');
       console.log('  Restaurant: GET /admin/restaurant/:tenantId/tables, /menu, /orders, /payment-config, etc.');
       console.log('  Public: GET /api/public/menu/:restaurantSlug/:tableIdentifier, POST /api/public/order, POST /api/public/payment/create-order, etc.');
       console.log('\n');
+    });
+
+    server.on('error', (err) => {
+      console.error('Server error:', err);
+      process.exit(1);
     });
 
     // Graceful shutdown handler
@@ -94,4 +101,18 @@ async function start() {
   }
 }
 
-start();
+// Global error handlers
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  process.exit(1);
+});
+
+start().catch((err) => {
+  console.error('Fatal startup error:', err);
+  process.exit(1);
+});
