@@ -22,6 +22,7 @@ const authRoutes = require('./routes/auth');
 const superadminRoutes = require('./routes/superadmin');
 const restaurantRoutes = require('./routes/restaurant');
 const publicRoutes = require('./routes/public');
+const paytmRoutes = require('./routes/paytm');
 
 // Health check
 app.get('/', (req, res) => {
@@ -33,6 +34,7 @@ app.use('/auth', authRoutes);
 app.use('/admin/superadmin', superadminRoutes);
 app.use('/admin/restaurant', restaurantRoutes);
 app.use('/api/public', publicRoutes);
+app.use('/api/payment/paytm', paytmRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
