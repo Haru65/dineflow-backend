@@ -8,6 +8,7 @@ const MenuItemRepository = require('../repositories/MenuItemRepository');
 const OrderRepository = require('../repositories/OrderRepository');
 const OrderItemRepository = require('../repositories/OrderItemRepository');
 const PaymentProviderRepository = require('../repositories/PaymentProviderRepository');
+const PaytmService = require('../utils/paytmService');
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
 const EmailService = require('../utils/emailService');
@@ -140,6 +141,32 @@ router.post('/order/:restaurantSlug/:tableIdentifier', async (req, res) => {
     // Get the created order with items
     const createdOrder = await OrderRepository.findById(orderId);
     const orderItems = await OrderItemRepository.findByOrder(orderId);
+    
+    // Emit Socket.io event for real-time kitchen updates
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`tenant-${tenant.id}`).emit('new-order', {
+        orderId: createdOrder.id,
+        tableId: table.id,
+        tableName: table.name,
+        status: createdOrder.status,
+        totalAmount: createdOrder.total_amount,
+        items: orderItems.map(item => ({
+          name: item.name_snapshot,
+          quantity: item.quantity,
+          price: item.price_snapshot
+        })),
+        createdAt: createdOrder.created_at
+      });
+      
+      io.to(`kitchen-${tenant.id}`).emit('kitchen-order', {
+        orderId: createdOrder.id,
+        tableId: table.id,
+        tableName: table.name,
+        items: orderItems,
+        createdAt: createdOrder.created_at
+      });
+    }
     
     // Send order confirmation email
     EmailService.sendOrderConfirmation(
