@@ -4,12 +4,12 @@ const { generateId } = require('../utils/helpers');
 class RestaurantTableRepository {
   async create(tableData) {
     const id = generateId();
-    const { tenant_id, name, identifier, qr_url, is_active = 1 } = tableData;
+    const { tenant_id, name, identifier, qr_url, is_active = 1, table_type = 'regular' } = tableData;
 
     await dbRun(
-      `INSERT INTO restaurant_tables (id, tenant_id, name, identifier, qr_url, is_active)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [id, tenant_id, name, identifier, qr_url, is_active]
+      `INSERT INTO restaurant_tables (id, tenant_id, name, identifier, qr_url, is_active, table_type)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [id, tenant_id, name, identifier, qr_url, is_active, table_type]
     );
     return id;
   }
