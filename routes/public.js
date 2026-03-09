@@ -22,6 +22,38 @@ router.get('/health', (req, res) => {
   });
 });
 
+// Debug endpoint - list all tables for a restaurant
+router.get('/debug/tables/:restaurantSlug', async (req, res) => {
+  try {
+    const { restaurantSlug } = req.params;
+    
+    const tenant = await TenantRepository.findBySlug(restaurantSlug);
+    if (!tenant) {
+      return errorResponse(res, 404, 'Restaurant not found');
+    }
+
+    const tables = await RestaurantTableRepository.findByTenant(tenant.id);
+    
+    successResponse(res, 200, {
+      restaurant: {
+        id: tenant.id,
+        name: tenant.name,
+        slug: tenant.slug
+      },
+      tables: tables.map(t => ({
+        id: t.id,
+        name: t.name,
+        identifier: t.identifier,
+        qr_url: t.qr_url,
+        is_active: t.is_active
+      }))
+    });
+  } catch (error) {
+    console.error('Debug tables error:', error);
+    errorResponse(res, 500, 'Internal server error', error.message);
+  }
+});
+
 // Get public menu for a table
 router.get('/menu/:restaurantSlug/:tableIdentifier', async (req, res) => {
   try {
