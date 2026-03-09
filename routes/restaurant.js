@@ -481,6 +481,33 @@ router.patch('/:tenantId/orders/:orderId', authenticateToken, authorizeRestauran
     await OrderRepository.updateById(req.params.orderId, updates);
     const updated = await OrderRepository.findById(req.params.orderId);
 
+    // Emit Socket.io event for real-time updates
+    const io = req.app.get('io');
+    if (io) {
+      // Notify kitchen
+      io.to(`kitchen-${req.params.tenantId}`).emit('order-status-updated', {
+        orderId: updated.id,
+        status: updated.status,
+        updatedAt: updated.updated_at
+      });
+      
+      // Notify table
+      if (updated.table_id) {
+        io.to(`table-${updated.table_id}`).emit('order-status-updated', {
+          orderId: updated.id,
+          status: updated.status,
+          updatedAt: updated.updated_at
+        });
+      }
+      
+      // Notify tenant dashboard
+      io.to(`tenant-${req.params.tenantId}`).emit('order-updated', {
+        orderId: updated.id,
+        status: updated.status,
+        updatedAt: updated.updated_at
+      });
+    }
+
     successResponse(res, 200, updated, 'Order updated successfully');
   } catch (error) {
     console.error('Update order error:', error);
@@ -537,14 +564,22 @@ router.put('/:tenantId/orders/:orderId/items/:itemId', authenticateToken, author
 // Get payment provider config
 router.get('/:tenantId/payment-config', authenticateToken, authorizeRestaurantAdmin, verifyTenantAccess, async (req, res) => {
   try {
-    const config = await PaymentProviderRepository.findByTenant(req.params.tenantId, 'razorpay');
+    const provider = req.query.provider || 'razorpay'; // Default to razorpay for backward compatibility
+    const config = await PaymentProviderRepository.findByTenant(req.params.tenantId, provider);
     
     if (config) {
-      // Don't expose the secret
+      // Don't expose the full secret, return masked version
+      const maskedSecret = config.key_secret 
+        ? config.key_secret.substring(0, 10) + '***'
+        : null;
+      
       return successResponse(res, 200, {
         id: config.id,
         provider: config.provider,
         key_id: config.key_id,
+        key_secret: maskedSecret,
+        webhook_secret: config.webhook_secret,
+        website: config.website || 'WEBSTAGING',
         is_active: config.is_active,
         created_at: config.created_at
       });
@@ -560,21 +595,31 @@ router.get('/:tenantId/payment-config', authenticateToken, authorizeRestaurantAd
 // Create or update payment provider config
 router.post('/:tenantId/payment-config', authenticateToken, authorizeRestaurantAdmin, verifyTenantAccess, async (req, res) => {
   try {
-    const { key_id, key_secret, webhook_secret } = req.body;
+    const { provider = 'razorpay', key_id, key_secret, webhook_secret, website } = req.body;
 
     if (!key_id || !key_secret) {
       return errorResponse(res, 400, 'Key ID and key secret are required');
     }
 
-    const existing = await PaymentProviderRepository.findByTenant(req.params.tenantId, 'razorpay');
+    if (!['razorpay', 'paytm'].includes(provider)) {
+      return errorResponse(res, 400, 'Invalid payment provider');
+    }
+
+    const existing = await PaymentProviderRepository.findByTenant(req.params.tenantId, provider);
 
     if (existing) {
       // Update
-      await PaymentProviderRepository.updateById(existing.id, {
+      const updates = {
         key_id,
         key_secret,
         webhook_secret: webhook_secret || existing.webhook_secret
-      });
+      };
+      
+      if (provider === 'paytm' && website) {
+        updates.website = website;
+      }
+
+      await PaymentProviderRepository.updateById(existing.id, updates);
 
       const updated = await PaymentProviderRepository.findById(existing.id);
       return successResponse(res, 200, {
@@ -582,22 +627,28 @@ router.post('/:tenantId/payment-config', authenticateToken, authorizeRestaurantA
         provider: updated.provider,
         key_id: updated.key_id,
         is_active: updated.is_active
-      }, 'Payment config updated successfully');
+      }, `${provider} config updated successfully`);
     } else {
       // Create
-      const configId = await PaymentProviderRepository.create({
+      const configData = {
         tenant_id: req.params.tenantId,
-        provider: 'razorpay',
+        provider,
         key_id,
         key_secret,
         webhook_secret
-      });
+      };
+      
+      if (provider === 'paytm' && website) {
+        configData.website = website;
+      }
+
+      const configId = await PaymentProviderRepository.create(configData);
 
       successResponse(res, 201, {
         id: configId,
-        provider: 'razorpay',
+        provider,
         key_id
-      }, 'Payment config created successfully');
+      }, `${provider} config created successfully`);
     }
   } catch (error) {
     console.error('Create/update payment config error:', error);

@@ -35,6 +35,7 @@ const publicRoutes = require('./routes/public');
 const paytmRoutes = require('./routes/paytm');
 const webhookRoutes = require('./routes/webhooks');
 const featuresRoutes = require('./routes/features');
+const paytmPaymentRoutes = require('./routes/paytm');
 
 // Health check
 app.get('/', (req, res) => {
@@ -47,7 +48,7 @@ app.use('/admin/superadmin', superadminRoutes);
 app.use('/admin/restaurant', restaurantRoutes);
 app.use('/admin/restaurant', featuresRoutes);
 app.use('/api/public', publicRoutes);
-app.use('/api/payment/paytm', paytmRoutes);
+app.use('/api/paytm', paytmPaymentRoutes);
 app.use('/api/webhooks', webhookRoutes);
 
 // Error handling middleware (must be last)
@@ -65,7 +66,9 @@ app.use((req, res) => {
 
 // Initialize database and start server
 const PORT = process.env.PORT || 3000;
-const { closeDatabase } = require('./database');
+const { closeDatabase } = require(dbModule);
+const http = require('http');
+const { Server } = require('socket.io');
 
 async function start() {
   try {
@@ -73,14 +76,58 @@ async function start() {
     await initializeDatabase();
     console.log('Database initialized successfully');
 
-    const server = app.listen(PORT, '0.0.0.0', () => {
+    // Create HTTP server
+    const server = http.createServer(app);
+
+    // Initialize Socket.io
+    const io = new Server(server, {
+      cors: {
+        origin: corsOrigins,
+        methods: ['GET', 'POST'],
+        credentials: true
+      }
+    });
+
+    // Socket.io connection handling
+    io.on('connection', (socket) => {
+      console.log('Client connected:', socket.id);
+
+      // Join tenant room
+      socket.on('join-tenant', (tenantId) => {
+        socket.join(`tenant-${tenantId}`);
+        console.log(`Socket ${socket.id} joined tenant-${tenantId}`);
+      });
+
+      // Join kitchen room
+      socket.on('join-kitchen', (tenantId) => {
+        socket.join(`kitchen-${tenantId}`);
+        console.log(`Socket ${socket.id} joined kitchen-${tenantId}`);
+      });
+
+      // Join table room
+      socket.on('join-table', (tableId) => {
+        socket.join(`table-${tableId}`);
+        console.log(`Socket ${socket.id} joined table-${tableId}`);
+      });
+
+      socket.on('disconnect', () => {
+        console.log('Client disconnected:', socket.id);
+      });
+    });
+
+    // Make io available to routes
+    app.set('io', io);
+
+    server.listen(PORT, '0.0.0.0', () => {
       console.log(`\n✅ SERVER LISTENING on 0.0.0.0:${PORT}`);
       console.log(`🚀 DineFlow Backend running on port ${PORT}`);
+      console.log(`🔌 Socket.io enabled for real-time updates`);
       console.log('\nAvailable routes:');
       console.log('  Authentication: POST /auth/login, POST /auth/init-superadmin, GET /auth/me');
       console.log('  Superadmin: GET /admin/superadmin/tenants, POST /admin/superadmin/tenants, etc.');
       console.log('  Restaurant: GET /admin/restaurant/:tenantId/tables, /menu, /orders, /payment-config, etc.');
       console.log('  Public: GET /api/public/menu/:restaurantSlug/:tableIdentifier, POST /api/public/order, POST /api/public/payment/create-order, etc.');
+      console.log('  Paytm: POST /api/paytm/create-order, POST /api/paytm/callback, GET /api/paytm/status/:orderId');
       console.log('\n');
     });
 
