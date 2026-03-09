@@ -1,7 +1,11 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const { initializeDatabase } = require('./database');
+
+// Use PostgreSQL if DATABASE_URL is set, otherwise use SQLite
+const dbModule = process.env.DATABASE_URL ? './database-postgres' : './database';
+const { initializeDatabase } = require(dbModule);
+
 const { errorHandler, asyncHandler } = require('./utils/errorHandler');
 const { validateContentType, rateLimit } = require('./utils/validation');
 
