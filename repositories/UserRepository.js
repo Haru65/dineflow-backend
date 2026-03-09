@@ -26,7 +26,7 @@ class UserRepository {
   }
 
   async findByEmail(email) {
-    return dbGet('SELECT * FROM users WHERE email = ? AND is_active = 1', [email]);
+    return dbGet('SELECT * FROM users WHERE email = ?', [email]);
   }
 
   async findByTenant(tenantId) {
