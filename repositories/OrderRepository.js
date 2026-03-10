@@ -38,17 +38,21 @@ class OrderRepository {
   async findByTenant(tenantId, filters = {}) {
     let query = 'SELECT * FROM orders WHERE tenant_id = $1';
     const params = [tenantId];
+    let paramCount = 1;
 
     if (filters.status) {
-      query += ' AND status = $1';
+      paramCount++;
+      query += ` AND status = $${paramCount}`;
       params.push(filters.status);
     }
     if (filters.source_type) {
-      query += ' AND source_type = $1';
+      paramCount++;
+      query += ` AND source_type = $${paramCount}`;
       params.push(filters.source_type);
     }
     if (filters.payment_status) {
-      query += ' AND payment_status = $1';
+      paramCount++;
+      query += ` AND payment_status = $${paramCount}`;
       params.push(filters.payment_status);
     }
 
@@ -72,12 +76,12 @@ class OrderRepository {
 
   async updateById(id, updates) {
     const fields = Object.keys(updates)
-      .map(key => `${key} = $1`)
+      .map((key, index) => `${key} = $${index + 1}`)
       .join(', ');
     const values = Object.values(updates);
 
     await dbRun(
-      `UPDATE orders SET ${fields}, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+      `UPDATE orders SET ${fields}, updated_at = CURRENT_TIMESTAMP WHERE id = $${values.length + 1}`,
       [...values, id]
     );
   }
