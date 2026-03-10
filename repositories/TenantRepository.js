@@ -9,18 +9,18 @@ class TenantRepository {
 
     await dbRun(
       `INSERT INTO tenants (id, name, slug, address, contact_phone)
-       VALUES (?, ?, ?, ?, ?)`,
+       VALUES ($1, $2, $3, $4, $5)`,
       [id, name, slug, address, contact_phone]
     );
     return { id, slug };
   }
 
   async findById(id) {
-    return dbGet('SELECT * FROM tenants WHERE id = ?', [id]);
+    return dbGet('SELECT * FROM tenants WHERE id = $1', [id]);
   }
 
   async findBySlug(slug) {
-    return dbGet('SELECT * FROM tenants WHERE slug = ?', [slug]);
+    return dbGet('SELECT * FROM tenants WHERE slug = $1', [slug]);
   }
 
   async findAll() {
@@ -29,18 +29,18 @@ class TenantRepository {
 
   async updateById(id, updates) {
     const fields = Object.keys(updates)
-      .map(key => `${key} = ?`)
+      .map((key, index) => `${key} = $${index + 1}`)
       .join(', ');
     const values = Object.values(updates);
 
     await dbRun(
-      `UPDATE tenants SET ${fields}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      `UPDATE tenants SET ${fields}, updated_at = CURRENT_TIMESTAMP WHERE id = $${values.length + 1}`,
       [...values, id]
     );
   }
 
   async deleteById(id) {
-    await dbRun('DELETE FROM tenants WHERE id = ?', [id]);
+    await dbRun('DELETE FROM tenants WHERE id = $1', [id]);
   }
 }
 

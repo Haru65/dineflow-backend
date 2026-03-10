@@ -15,37 +15,37 @@ class IntegrationRepository {
 
     await dbRun(
       `INSERT INTO integrations (id, tenant_id, provider, webhook_url, soapie_url, api_key, is_active)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [id, tenant_id, provider, webhook_url, soapie_url, api_key, is_active]
     );
     return id;
   }
 
   async findById(id) {
-    return dbGet('SELECT * FROM integrations WHERE id = ?', [id]);
+    return dbGet('SELECT * FROM integrations WHERE id = $1', [id]);
   }
 
   async findByTenant(tenantId, provider = null) {
     if (provider) {
       return dbGet(
-        'SELECT * FROM integrations WHERE tenant_id = ? AND provider = ?',
+        'SELECT * FROM integrations WHERE tenant_id = $1 AND provider = $2',
         [tenantId, provider]
       );
     }
     return dbGet(
-      'SELECT * FROM integrations WHERE tenant_id = ?',
+      'SELECT * FROM integrations WHERE tenant_id = $1',
       [tenantId]
     );
   }
 
   async updateById(id, updates) {
     const fields = Object.keys(updates)
-      .map(key => `${key} = ?`)
+      .map(key => `${key} = $1`)
       .join(', ');
     const values = Object.values(updates);
 
     await dbRun(
-      `UPDATE integrations SET ${fields}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      `UPDATE integrations SET ${fields}, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
       [...values, id]
     );
   }

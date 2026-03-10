@@ -22,7 +22,7 @@ class TableStatusRepository {
       FROM restaurant_tables t
       LEFT JOIN orders o ON t.id = o.table_id 
         AND o.status IN ('pending', 'confirmed', 'cooking', 'ready')
-      WHERE t.tenant_id = ? AND t.is_active = 1
+      WHERE t.tenant_id = $1 AND t.is_active = 1
       GROUP BY t.id
       ORDER BY t.name
     `;
@@ -56,7 +56,7 @@ class TableStatusRepository {
         status,
         status_color: statusColor,
         status_icon: statusIcon,
-        has_overdue: table.oldest_order_time ? 
+        has_overdue: table.oldest_order_time $1 
           (new Date() - new Date(table.oldest_order_time)) > (20 * 60 * 1000) : false
       };
     });
@@ -67,8 +67,8 @@ class TableStatusRepository {
   static async updateTableStatus(tableId, status) {
     const query = `
       UPDATE restaurant_tables 
-      SET current_status = ?, updated_at = CURRENT_TIMESTAMP 
-      WHERE id = ?
+      SET current_status = $2, updated_at = CURRENT_TIMESTAMP 
+      WHERE id = $3
     `;
     
     const result = await dbRun(query, [status, tableId]);
@@ -93,7 +93,7 @@ class TableStatusRepository {
           ELSE 'available'
         END,
         updated_at = CURRENT_TIMESTAMP
-      WHERE tenant_id = ?
+      WHERE tenant_id = $1
     `;
     
     const result = await dbRun(query, [tenantId]);

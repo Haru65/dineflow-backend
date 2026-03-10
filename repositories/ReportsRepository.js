@@ -2,16 +2,16 @@ const { dbAll, dbRun, dbGet } = require('../database-postgres');
 
 class ReportsRepository {
   static async getOrderReport(tenantId, startDate, endDate, filters = {}) {
-    let whereClause = 'WHERE o.tenant_id = ? AND DATE(o.created_at) BETWEEN ? AND ?';
+    let whereClause = 'WHERE o.tenant_id = $1 AND DATE(o.created_at) BETWEEN $2 AND $3';
     const params = [tenantId, startDate, endDate];
     
     if (filters.source_type) {
-      whereClause += ' AND o.source_type = ?';
+      whereClause += ' AND o.source_type = $1';
       params.push(filters.source_type);
     }
     
     if (filters.status) {
-      whereClause += ' AND o.status = ?';
+      whereClause += ' AND o.status = $1';
       params.push(filters.status);
     }
     
@@ -40,10 +40,10 @@ class ReportsRepository {
     const summary = {
       total_orders: dailyData.reduce((sum, day) => sum + day.total_orders, 0),
       total_revenue: dailyData.reduce((sum, day) => sum + (day.revenue || 0), 0),
-      avg_order_value: dailyData.length > 0 ? 
+      avg_order_value: dailyData.length > 0 $1 
         dailyData.reduce((sum, day) => sum + (day.revenue || 0), 0) / 
         dailyData.reduce((sum, day) => sum + day.total_orders, 0) : 0,
-      completion_rate: dailyData.length > 0 ?
+      completion_rate: dailyData.length > 0 $2
         (dailyData.reduce((sum, day) => sum + day.completed_orders, 0) / 
          dailyData.reduce((sum, day) => sum + day.total_orders, 0)) * 100 : 0
     };
@@ -75,8 +75,8 @@ class ReportsRepository {
   }
   
   static async getRevenueReport(tenantId, period = 'daily', startDate, endDate) {
-    const dateFormat = period === 'monthly' ? '%Y-%m' : 
-                      period === 'weekly' ? '%Y-%W' : '%Y-%m-%d';
+    const dateFormat = period === 'monthly' $1 '%Y-%m' : 
+                      period === 'weekly' $1 '%Y-%W' : '%Y-%m-%d';
     
     const query = `
       SELECT 
@@ -91,8 +91,8 @@ class ReportsRepository {
         COUNT(CASE WHEN o.payment_status = 'paid' THEN 1 END) as paid_orders,
         SUM(CASE WHEN o.payment_status = 'paid' THEN o.total_amount ELSE 0 END) as paid_revenue
       FROM orders o
-      WHERE o.tenant_id = ? 
-        AND DATE(o.created_at) BETWEEN ? AND ?
+      WHERE o.tenant_id = $1 
+        AND DATE(o.created_at) BETWEEN $2 AND $3
         AND o.status IN ('completed', 'served')
       GROUP BY strftime('${dateFormat}', o.created_at)
       ORDER BY period DESC
@@ -104,10 +104,10 @@ class ReportsRepository {
     const summary = {
       total_revenue: data.reduce((sum, period) => sum + (period.total_revenue || 0), 0),
       total_orders: data.reduce((sum, period) => sum + period.total_orders, 0),
-      avg_order_value: data.length > 0 ? 
+      avg_order_value: data.length > 0 $1 
         data.reduce((sum, period) => sum + (period.total_revenue || 0), 0) / 
         data.reduce((sum, period) => sum + period.total_orders, 0) : 0,
-      payment_success_rate: data.length > 0 ?
+      payment_success_rate: data.length > 0 $2
         (data.reduce((sum, period) => sum + period.paid_orders, 0) / 
          data.reduce((sum, period) => sum + period.total_orders, 0)) * 100 : 0
     };
@@ -136,8 +136,8 @@ class ReportsRepository {
       JOIN orders o ON oi.order_id = o.id
       JOIN menu_items mi ON oi.menu_item_id = mi.id
       JOIN menu_categories mc ON mi.category_id = mc.id
-      WHERE o.tenant_id = ? 
-        AND DATE(o.created_at) BETWEEN ? AND ?
+      WHERE o.tenant_id = $1 
+        AND DATE(o.created_at) BETWEEN $2 AND $3
         AND o.status IN ('completed', 'served')
       GROUP BY mi.id
       ORDER BY total_quantity DESC
@@ -156,8 +156,8 @@ class ReportsRepository {
       JOIN orders o ON oi.order_id = o.id
       JOIN menu_items mi ON oi.menu_item_id = mi.id
       JOIN menu_categories mc ON mi.category_id = mc.id
-      WHERE o.tenant_id = ? 
-        AND DATE(o.created_at) BETWEEN ? AND ?
+      WHERE o.tenant_id = $1 
+        AND DATE(o.created_at) BETWEEN $2 AND $3
         AND o.status IN ('completed', 'served')
       GROUP BY mc.id
       ORDER BY total_revenue DESC
@@ -186,7 +186,7 @@ class ReportsRepository {
     const recentOrdersQuery = `
       SELECT COUNT(*) as count
       FROM orders 
-      WHERE tenant_id = ? 
+      WHERE tenant_id = $1 
         AND created_at >= datetime('now', '-${days} days')
     `;
     
@@ -197,7 +197,7 @@ class ReportsRepository {
         AVG(total_amount) as avg_order_value,
         COUNT(*) as total_orders
       FROM orders 
-      WHERE tenant_id = ? 
+      WHERE tenant_id = $1 
         AND created_at >= datetime('now', '-${days} days')
         AND status IN ('completed', 'served')
         AND payment_status = 'paid'
@@ -211,7 +211,7 @@ class ReportsRepository {
       FROM order_items oi
       JOIN orders o ON oi.order_id = o.id
       JOIN menu_items mi ON oi.menu_item_id = mi.id
-      WHERE o.tenant_id = ? 
+      WHERE o.tenant_id = $1 
         AND o.created_at >= datetime('now', '-${days} days')
         AND o.status IN ('completed', 'served')
       GROUP BY mi.id

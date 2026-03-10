@@ -14,14 +14,14 @@ class OrderItemRepository {
 
     await dbRun(
       `INSERT INTO order_items (id, order_id, menu_item_id, name_snapshot, price_snapshot, quantity)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+       VALUES ($1, $2, $3, $4, $5, $6)`,
       [id, order_id, menu_item_id, name_snapshot, price_snapshot, quantity]
     );
     return id;
   }
 
   async findById(id) {
-    return dbGet('SELECT * FROM order_items WHERE id = ?', [id]);
+    return dbGet('SELECT * FROM order_items WHERE id = $1', [id]);
   }
 
   async findByOrder(orderId) {
@@ -32,13 +32,13 @@ class OrderItemRepository {
         mi.is_veg, mi.is_spicy
       FROM order_items oi
       LEFT JOIN menu_items mi ON oi.menu_item_id = mi.id
-      WHERE oi.order_id = ?`,
+      WHERE oi.order_id = $1`,
       [orderId]
     );
   }
 
   async deleteByOrder(orderId) {
-    await dbRun('DELETE FROM order_items WHERE order_id = ?', [orderId]);
+    await dbRun('DELETE FROM order_items WHERE order_id = $1', [orderId]);
   }
 
   async updateById(id, updates) {
@@ -46,7 +46,7 @@ class OrderItemRepository {
     const values = [];
 
     for (const [key, value] of Object.entries(updates)) {
-      fields.push(`${key} = ?`);
+      fields.push(`${key} = $1`);
       values.push(value);
     }
 
@@ -54,7 +54,7 @@ class OrderItemRepository {
 
     values.push(id);
     await dbRun(
-      `UPDATE order_items SET ${fields.join(', ')} WHERE id = ?`,
+      `UPDATE order_items SET ${fields.join(', ')} WHERE id = $1`,
       values
     );
   }
