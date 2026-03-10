@@ -1,4 +1,4 @@
-const { dbRun, dbGet, dbAll } = require('../database');
+const { dbRun, dbGet, dbAll } = require('../database-postgres');
 const { generateId } = require('../utils/helpers');
 
 class EmailConfigRepository {

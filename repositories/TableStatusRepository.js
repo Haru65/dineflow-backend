@@ -1,4 +1,4 @@
-const { dbAll, dbRun, dbGet } = require('../database');
+const { dbAll, dbRun, dbGet } = require('../database-postgres');
 
 class TableStatusRepository {
   static async getTableStatusByTenant(tenantId) {

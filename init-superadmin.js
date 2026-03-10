@@ -1,7 +1,7 @@
 require('dotenv').config();
 const UserRepository = require('./repositories/UserRepository');
 const { hashPassword } = require('./utils/auth');
-const { initializeDatabase } = require('./database');
+const { initializeDatabase } = require('./database-postgres');
 
 async function initSuperadmin() {
   try {

@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { initializeDatabase } = require('../database');
+const { initializeDatabase } = require('../database-postgres');
 
 async function runMigrations() {
   console.log('Starting migrations...');
