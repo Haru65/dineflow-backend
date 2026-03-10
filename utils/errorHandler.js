@@ -88,10 +88,13 @@ function errorHandler(err, req, res, next) {
   } else if (err.name === 'ConflictError') {
     statusCode = 409;
     message = 'Conflict';
-  } else if (err.code === 'SQLITE_CONSTRAINT') {
+  } else if (err.code === 'ECONNREFUSED') {
+    statusCode = 503;
+    message = 'Database connection refused';
+  } else if (err.code === '23505') { // PostgreSQL unique violation
     statusCode = 409;
     message = 'Database constraint violation';
-  } else if (err.code === 'SQLITE_CANTOPEN') {
+  } else if (err.code === 'ENOTFOUND') {
     statusCode = 500;
     message = 'Database connection error';
   }

@@ -39,12 +39,11 @@ const sanitizeString = (str) => {
   return str.trim().replace(/[<>]/g, '');
 };
 
-// Convert SQLite DATETIME string (UTC) to ISO format
-const formatTimestamp = (sqliteTimestamp) => {
-  if (!sqliteTimestamp) return new Date().toISOString();
-  // SQLite stores as "YYYY-MM-DD HH:MM:SS" in UTC
-  // Convert to ISO 8601 with Z suffix
-  const timestamp = sqliteTimestamp.replace(' ', 'T') + 'Z';
+// Convert PostgreSQL TIMESTAMP to ISO format
+const formatTimestamp = (pgTimestamp) => {
+  if (!pgTimestamp) return new Date().toISOString();
+  // PostgreSQL returns ISO-compatible timestamps
+  const timestamp = new Date(pgTimestamp).toISOString();
   return timestamp;
 };
 

@@ -4,14 +4,17 @@ class ReportsRepository {
   static async getOrderReport(tenantId, startDate, endDate, filters = {}) {
     let whereClause = 'WHERE o.tenant_id = $1 AND DATE(o.created_at) BETWEEN $2 AND $3';
     const params = [tenantId, startDate, endDate];
+    let paramCount = 3;
     
     if (filters.source_type) {
-      whereClause += ' AND o.source_type = $1';
+      paramCount++;
+      whereClause += ` AND o.source_type = $${paramCount}`;
       params.push(filters.source_type);
     }
     
     if (filters.status) {
-      whereClause += ' AND o.status = $1';
+      paramCount++;
+      whereClause += ` AND o.status = $${paramCount}`;
       params.push(filters.status);
     }
     
@@ -40,10 +43,10 @@ class ReportsRepository {
     const summary = {
       total_orders: dailyData.reduce((sum, day) => sum + day.total_orders, 0),
       total_revenue: dailyData.reduce((sum, day) => sum + (day.revenue || 0), 0),
-      avg_order_value: dailyData.length > 0 $1 
+      avg_order_value: dailyData.length > 0 ? 
         dailyData.reduce((sum, day) => sum + (day.revenue || 0), 0) / 
         dailyData.reduce((sum, day) => sum + day.total_orders, 0) : 0,
-      completion_rate: dailyData.length > 0 $2
+      completion_rate: dailyData.length > 0 ?
         (dailyData.reduce((sum, day) => sum + day.completed_orders, 0) / 
          dailyData.reduce((sum, day) => sum + day.total_orders, 0)) * 100 : 0
     };
@@ -75,12 +78,12 @@ class ReportsRepository {
   }
   
   static async getRevenueReport(tenantId, period = 'daily', startDate, endDate) {
-    const dateFormat = period === 'monthly' $1 '%Y-%m' : 
-                      period === 'weekly' $1 '%Y-%W' : '%Y-%m-%d';
+    const dateFormat = period === 'monthly' ? 'YYYY-MM' : 
+                      period === 'weekly' ? 'IYYY-IW' : 'YYYY-MM-DD';
     
     const query = `
       SELECT 
-        strftime('${dateFormat}', o.created_at) as period,
+        TO_CHAR(o.created_at, '${dateFormat}') as period,
         COUNT(*) as total_orders,
         SUM(o.total_amount) as total_revenue,
         SUM(o.tax_amount) as total_tax,
@@ -94,7 +97,7 @@ class ReportsRepository {
       WHERE o.tenant_id = $1 
         AND DATE(o.created_at) BETWEEN $2 AND $3
         AND o.status IN ('completed', 'served')
-      GROUP BY strftime('${dateFormat}', o.created_at)
+      GROUP BY TO_CHAR(o.created_at, '${dateFormat}')
       ORDER BY period DESC
     `;
     
@@ -104,10 +107,10 @@ class ReportsRepository {
     const summary = {
       total_revenue: data.reduce((sum, period) => sum + (period.total_revenue || 0), 0),
       total_orders: data.reduce((sum, period) => sum + period.total_orders, 0),
-      avg_order_value: data.length > 0 $1 
+      avg_order_value: data.length > 0 ? 
         data.reduce((sum, period) => sum + (period.total_revenue || 0), 0) / 
         data.reduce((sum, period) => sum + period.total_orders, 0) : 0,
-      payment_success_rate: data.length > 0 $2
+      payment_success_rate: data.length > 0 ?
         (data.reduce((sum, period) => sum + period.paid_orders, 0) / 
          data.reduce((sum, period) => sum + period.total_orders, 0)) * 100 : 0
     };
@@ -178,16 +181,12 @@ class ReportsRepository {
   }
   
   static async getDashboardMetrics(tenantId, days = 30) {
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
-    const endDate = new Date();
-    
     // Recent orders
     const recentOrdersQuery = `
       SELECT COUNT(*) as count
       FROM orders 
       WHERE tenant_id = $1 
-        AND created_at >= datetime('now', '-${days} days')
+        AND created_at >= NOW() - INTERVAL '${days} days'
     `;
     
     // Revenue metrics
@@ -198,7 +197,7 @@ class ReportsRepository {
         COUNT(*) as total_orders
       FROM orders 
       WHERE tenant_id = $1 
-        AND created_at >= datetime('now', '-${days} days')
+        AND created_at >= NOW() - INTERVAL '${days} days'
         AND status IN ('completed', 'served')
         AND payment_status = 'paid'
     `;
@@ -212,9 +211,9 @@ class ReportsRepository {
       JOIN orders o ON oi.order_id = o.id
       JOIN menu_items mi ON oi.menu_item_id = mi.id
       WHERE o.tenant_id = $1 
-        AND o.created_at >= datetime('now', '-${days} days')
+        AND o.created_at >= NOW() - INTERVAL '${days} days'
         AND o.status IN ('completed', 'served')
-      GROUP BY mi.id
+      GROUP BY mi.id, mi.name
       ORDER BY quantity DESC
       LIMIT 5
     `;
