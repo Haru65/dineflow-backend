@@ -12,6 +12,8 @@
     "migrate": "node migrations/migrate.js",
     "migrate-postgres": "node migrations/run-postgres-migrations.js",
     "fix-constraint": "node fix-production-constraint.js",
+    "setup-paytm": "node setup-paytm-config.js",
+    "fix-paytm-setup": "node fix-paytm-setup.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
