@@ -1,4 +1,4 @@
-const { dbAll, dbRun, dbGet } = require('../database');
+const { dbAll, dbRun, dbGet } = require('../database-postgres');
 
 class ReportsRepository {
   static async getOrderReport(tenantId, startDate, endDate, filters = {}) {

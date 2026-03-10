@@ -1,4 +1,4 @@
-const database = require('./database');
+const database = require('./database-postgres');
 const TenantRepository = require('./repositories/TenantRepository');
 const MenuCategoryRepository = require('./repositories/MenuCategoryRepository');
 const { createDefaultCategories } = require('./utils/defaultCategories');

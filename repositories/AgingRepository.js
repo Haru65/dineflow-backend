@@ -1,4 +1,4 @@
-const { dbAll, dbRun, dbGet } = require('../database');
+const { dbAll, dbRun, dbGet } = require('../database-postgres');
 const { generateId } = require('../utils/helpers');
 
 class AgingRepository {

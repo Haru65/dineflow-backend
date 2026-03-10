@@ -1,4 +1,4 @@
-const { dbRun, dbGet } = require('../database');
+const { dbRun, dbGet } = require('../database-postgres');
 const { generateId } = require('../utils/helpers');
 
 class PaymentProviderRepository {

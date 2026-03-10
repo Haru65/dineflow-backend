@@ -1,4 +1,4 @@
-const { dbRun, dbGet, dbAll } = require('../database');
+const { dbRun, dbGet, dbAll } = require('../database-postgres');
 const { generateId, generateQRUrl } = require('../utils/helpers');
 
 class ReceptionistQRRepository {
