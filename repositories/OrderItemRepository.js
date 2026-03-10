@@ -44,17 +44,20 @@ class OrderItemRepository {
   async updateById(id, updates) {
     const fields = [];
     const values = [];
+    let paramCount = 0;
 
     for (const [key, value] of Object.entries(updates)) {
-      fields.push(`${key} = $1`);
+      paramCount++;
+      fields.push(`${key} = $${paramCount}`);
       values.push(value);
     }
 
     if (fields.length === 0) return;
 
+    paramCount++;
     values.push(id);
     await dbRun(
-      `UPDATE order_items SET ${fields.join(', ')} WHERE id = $1`,
+      `UPDATE order_items SET ${fields.join(', ')} WHERE id = $${paramCount}`,
       values
     );
   }
