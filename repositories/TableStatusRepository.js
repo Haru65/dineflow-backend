@@ -56,7 +56,7 @@ class TableStatusRepository {
         status,
         status_color: statusColor,
         status_icon: statusIcon,
-        has_overdue: table.oldest_order_time $1 
+        has_overdue: table.oldest_order_time ? 
           (new Date() - new Date(table.oldest_order_time)) > (20 * 60 * 1000) : false
       };
     });
