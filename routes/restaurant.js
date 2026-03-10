@@ -380,6 +380,50 @@ router.delete('/:tenantId/menu/items/:itemId', authenticateToken, authorizeResta
   }
 });
 
+// Auto-update image for menu item
+router.post('/:tenantId/menu/items/:itemId/auto-image', authenticateToken, authorizeRestaurantAdmin, verifyTenantAccess, async (req, res) => {
+  try {
+    const item = await MenuItemRepository.findById(req.params.itemId);
+
+    if (!item || item.tenant_id !== req.params.tenantId) {
+      return errorResponse(res, 404, 'Menu item not found');
+    }
+
+    const imageUrl = await MenuItemRepository.autoUpdateImage(req.params.itemId);
+    
+    if (imageUrl) {
+      successResponse(res, 200, { id: req.params.itemId, image_url: imageUrl }, 'Image updated successfully');
+    } else {
+      errorResponse(res, 404, 'No image found for this item');
+    }
+  } catch (error) {
+    console.error('Auto-update image error:', error);
+    errorResponse(res, 500, 'Internal server error', error.message);
+  }
+});
+
+// Bulk update images for all items without images
+router.post('/:tenantId/menu/items/bulk-auto-images', authenticateToken, authorizeRestaurantAdmin, verifyTenantAccess, async (req, res) => {
+  try {
+    const results = await MenuItemRepository.bulkUpdateMissingImages(req.params.tenantId);
+    
+    const successful = results.filter(r => r.success).length;
+    const failed = results.filter(r => !r.success).length;
+    
+    successResponse(res, 200, {
+      results,
+      summary: {
+        total: results.length,
+        successful,
+        failed
+      }
+    }, `Bulk image update completed: ${successful} successful, ${failed} failed`);
+  } catch (error) {
+    console.error('Bulk auto-update images error:', error);
+    errorResponse(res, 500, 'Internal server error', error.message);
+  }
+});
+
 // ===================== ORDERS =====================
 
 // Get all orders for restaurant
