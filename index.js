@@ -33,9 +33,10 @@ const superadminRoutes = require('./routes/superadmin');
 const restaurantRoutes = require('./routes/restaurant');
 const publicRoutes = require('./routes/public');
 const paytmRoutes = require('./routes/paytm');
+const simplePaytmRoutes = require('./routes/simple-paytm');
+const workingPaymentRoutes = require('./routes/working-payment');
 const webhookRoutes = require('./routes/webhooks');
 const featuresRoutes = require('./routes/features');
-const paytmPaymentRoutes = require('./routes/paytm');
 
 // Health check
 app.get('/', (req, res) => {
@@ -48,7 +49,9 @@ app.use('/admin/superadmin', superadminRoutes);
 app.use('/admin/restaurant', restaurantRoutes);
 app.use('/admin/restaurant', featuresRoutes);
 app.use('/api/public', publicRoutes);
-app.use('/api/paytm', paytmPaymentRoutes);
+app.use('/api/paytm', paytmRoutes);
+app.use('/api/simple-paytm', simplePaytmRoutes);
+app.use('/api/working-payment', workingPaymentRoutes);
 app.use('/api/webhooks', webhookRoutes);
 
 // Error handling middleware (must be last)
