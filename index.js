@@ -35,6 +35,7 @@ const publicRoutes = require('./routes/public');
 const paytmRoutes = require('./routes/paytm');
 const simplePaytmRoutes = require('./routes/simple-paytm');
 const workingPaymentRoutes = require('./routes/working-payment');
+const paytmWorkingRoutes = require('./routes/paytm-working');
 const webhookRoutes = require('./routes/webhooks');
 const featuresRoutes = require('./routes/features');
 
@@ -52,6 +53,7 @@ app.use('/api/public', publicRoutes);
 app.use('/api/paytm', paytmRoutes);
 app.use('/api/simple-paytm', simplePaytmRoutes);
 app.use('/api/working-payment', workingPaymentRoutes);
+app.use('/api/paytm-working', paytmWorkingRoutes);
 app.use('/api/webhooks', webhookRoutes);
 
 // Error handling middleware (must be last)
