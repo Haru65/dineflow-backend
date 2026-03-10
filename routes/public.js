@@ -142,16 +142,17 @@ router.post('/order/:restaurantSlug/:tableIdentifier', async (req, res) => {
       totalAmount += parseFloat(menuItem.price) * quantity;
     }
 
-    // Create order
+    // Create order with draft status for online payments
+    const orderStatus = paymentMethod === 'online' ? 'draft' : 'pending';
     const paymentStatus = paymentMethod === 'online' ? 'pending' : 'pending';
-    const paymentProvider = paymentMethod === 'online' ? 'razorpay' : 'cash';
+    const paymentProvider = paymentMethod === 'online' ? 'paytm' : 'cash';
 
     const orderId = await OrderRepository.create({
       tenant_id: tenant.id,
       table_id: table.id,
       source_type: 'table',
       source_reference: tableIdentifier,
-      status: 'pending',
+      status: orderStatus,
       payment_status: paymentStatus,
       payment_provider: paymentProvider,
       total_amount: totalAmount,
@@ -174,9 +175,9 @@ router.post('/order/:restaurantSlug/:tableIdentifier', async (req, res) => {
     const createdOrder = await OrderRepository.findById(orderId);
     const orderItems = await OrderItemRepository.findByOrder(orderId);
     
-    // Emit Socket.io event for real-time kitchen updates
+    // Emit Socket.io event for real-time kitchen updates (only for confirmed orders)
     const io = req.app.get('io');
-    if (io) {
+    if (io && createdOrder.status !== 'draft') {
       io.to(`tenant-${tenant.id}`).emit('new-order', {
         orderId: createdOrder.id,
         tableId: table.id,
