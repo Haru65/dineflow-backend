@@ -128,7 +128,7 @@ router.post('/create-order', async (req, res) => {
     const callbackUrl = `${process.env.BASE_URL || 'http://localhost:3000'}/api/paytm/callback`;
 
     // Create UPI payment data
-    const upiPaymentData = PaytmService.createUpiPaymentData(
+    const upiPaymentData = await PaytmService.createUpiPaymentData(
       {
         merchantId: paymentConfig.key_id,
         merchantKey: paymentConfig.key_secret,
@@ -203,7 +203,7 @@ router.post('/callback', async (req, res) => {
     }
 
     // Verify checksum using new method
-    const verificationResult = PaytmService.verifyPaymentCallback(response, paymentConfig.key_secret);
+    const verificationResult = await PaytmService.verifyPaymentCallback(response, paymentConfig.key_secret);
 
     if (!verificationResult.isValid) {
       console.error('Invalid checksum for order:', ORDERID);

@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const https = require('https');
 const axios = require('axios');
-const PaytmChecksum = require('./paytmChecksum');
+const PaytmChecksum = require('paytmchecksum');
 
 class PaytmService {
   /**
@@ -31,13 +31,13 @@ class PaytmService {
       }
     };
 
-    // Generate checksum
-    const checksum = PaytmChecksum.generateSignatureByString(requestBody.body, merchantKey);
-    requestBody.head = {
-      signature: checksum
-    };
-
     try {
+      // Generate checksum using official library
+      const checksum = await PaytmChecksum.generateSignature(JSON.stringify(requestBody.body), merchantKey);
+      requestBody.head = {
+        signature: checksum
+      };
+
       const response = await axios.post(
         'https://securegw-stage.paytm.in/theia/api/v1/initiateTransaction?mid=' + merchantId + '&orderId=' + orderId,
         requestBody,
@@ -51,7 +51,7 @@ class PaytmService {
       return response.data;
     } catch (error) {
       console.error('Paytm transaction token creation failed:', error.response?.data || error.message);
-      throw new Error('Failed to create transaction token');
+      throw new Error('Failed to create transaction token: ' + (error.response?.data?.body?.resultInfo?.resultMsg || error.message));
     }
   }
 
@@ -61,24 +61,33 @@ class PaytmService {
    * @param {string} merchantKey - Paytm merchant key
    * @returns {Object} - Verification result
    */
-  static verifyPaymentCallback(response, merchantKey) {
+  static async verifyPaymentCallback(response, merchantKey) {
     const { CHECKSUMHASH, ...params } = response;
     
-    const isValid = PaytmChecksum.verifySignature(params, merchantKey, CHECKSUMHASH);
+    try {
+      const isValid = await PaytmChecksum.verifySignature(params, merchantKey, CHECKSUMHASH);
 
-    return {
-      isValid,
-      orderId: response.ORDERID,
-      transactionId: response.TXNID,
-      status: response.STATUS,
-      amount: response.TXNAMOUNT,
-      responseCode: response.RESPCODE,
-      responseMessage: response.RESPMSG,
-      bankName: response.BANKNAME,
-      paymentMode: response.PAYMENTMODE,
-      gatewayName: response.GATEWAYNAME,
-      bankTransactionId: response.BANKTXNID
-    };
+      return {
+        isValid,
+        orderId: response.ORDERID,
+        transactionId: response.TXNID,
+        status: response.STATUS,
+        amount: response.TXNAMOUNT,
+        responseCode: response.RESPCODE,
+        responseMessage: response.RESPMSG,
+        bankName: response.BANKNAME,
+        paymentMode: response.PAYMENTMODE,
+        gatewayName: response.GATEWAYNAME,
+        bankTransactionId: response.BANKTXNID
+      };
+    } catch (error) {
+      console.error('Checksum verification failed:', error);
+      return {
+        isValid: false,
+        orderId: response.ORDERID,
+        error: error.message
+      };
+    }
   }
 
   /**
@@ -97,12 +106,12 @@ class PaytmService {
       }
     };
 
-    const checksum = PaytmChecksum.generateSignatureByString(requestBody.body, merchantKey);
-    requestBody.head = {
-      signature: checksum
-    };
-
     try {
+      const checksum = await PaytmChecksum.generateSignature(JSON.stringify(requestBody.body), merchantKey);
+      requestBody.head = {
+        signature: checksum
+      };
+
       const response = await axios.post(
         'https://securegw-stage.paytm.in/theia/api/v1/getTransactionStatus',
         requestBody,
@@ -124,10 +133,10 @@ class PaytmService {
    * Generate Paytm checksum (legacy method for backward compatibility)
    * @param {Object} params - Payment parameters
    * @param {string} merchantKey - Paytm merchant key
-   * @returns {string} - Checksum
+   * @returns {Promise<string>} - Checksum
    */
-  static generateChecksum(params, merchantKey) {
-    return PaytmChecksum.generateSignature(params, merchantKey);
+  static async generateChecksum(params, merchantKey) {
+    return await PaytmChecksum.generateSignature(params, merchantKey);
   }
 
   /**
@@ -135,19 +144,19 @@ class PaytmService {
    * @param {Object} params - Payment parameters
    * @param {string} checksum - Checksum to verify
    * @param {string} merchantKey - Paytm merchant key
-   * @returns {boolean} - True if checksum is valid
+   * @returns {Promise<boolean>} - True if checksum is valid
    */
-  static verifyChecksum(params, checksum, merchantKey) {
-    return PaytmChecksum.verifySignature(params, merchantKey, checksum);
+  static async verifyChecksum(params, checksum, merchantKey) {
+    return await PaytmChecksum.verifySignature(params, merchantKey, checksum);
   }
 
   /**
    * Create Paytm payment request (legacy method)
    * @param {Object} config - Payment configuration
    * @param {Object} orderData - Order data
-   * @returns {Object} - Payment form data
+   * @returns {Promise<Object>} - Payment form data
    */
-  static createPaymentRequest(config, orderData) {
+  static async createPaymentRequest(config, orderData) {
     const {
       merchantId,
       merchantKey,
@@ -180,7 +189,7 @@ class PaytmService {
     };
 
     // Generate checksum
-    params.CHECKSUMHASH = this.generateChecksum(params, merchantKey);
+    params.CHECKSUMHASH = await this.generateChecksum(params, merchantKey);
 
     return params;
   }
@@ -189,9 +198,9 @@ class PaytmService {
    * Create UPI payment data for QR code and direct UPI payments
    * @param {Object} config - Payment configuration
    * @param {Object} orderData - Order data
-   * @returns {Object} - UPI payment data
+   * @returns {Promise<Object>} - UPI payment data
    */
-  static createUpiPaymentData(config, orderData) {
+  static async createUpiPaymentData(config, orderData) {
     const {
       merchantId,
       merchantKey,
@@ -227,7 +236,7 @@ class PaytmService {
       upiString,
       qrCodeData,
       // Keep original params for fallback
-      paymentParams: this.createPaymentRequest(config, orderData)
+      paymentParams: await this.createPaymentRequest(config, orderData)
     };
   }
 
@@ -246,16 +255,16 @@ class PaytmService {
    * Verify payment response from Paytm
    * @param {Object} response - Paytm callback response
    * @param {string} merchantKey - Paytm merchant key
-   * @returns {Object} - Verification result
+   * @returns {Promise<Object>} - Verification result
    */
-  static verifyPaymentResponse(response, merchantKey) {
+  static async verifyPaymentResponse(response, merchantKey) {
     const checksumhash = response.CHECKSUMHASH;
     
     // Remove checksum from params for verification
     const params = { ...response };
     delete params.CHECKSUMHASH;
 
-    const isValid = this.verifyChecksum(params, checksumhash, merchantKey);
+    const isValid = await this.verifyChecksum(params, checksumhash, merchantKey);
 
     return {
       isValid,
