@@ -7,152 +7,252 @@ const OrderItemRepository = require('../repositories/OrderItemRepository');
 const TenantRepository = require('../repositories/TenantRepository');
 const RestaurantTableRepository = require('../repositories/RestaurantTableRepository');
 const PaymentProviderRepository = require('../repositories/PaymentProviderRepository');
-const EmailService = require('../utils/emailService');
 
 /**
- * Create Paytm transaction token (New CheckoutJS method)
+ * PRODUCTION PAYTM PAYMENT ROUTES
+ * Single, clean, production-ready implementation
+ */
+
+/**
+ * Create Paytm transaction token (CheckoutJS method)
  * POST /api/paytm/create-transaction
- * Body: { orderId, amount, restaurantSlug, customerEmail, customerPhone }
  */
 router.post('/create-transaction', async (req, res) => {
   const requestId = 'txn_' + Date.now();
   
   try {
-    console.log(`\n🚀 [${requestId}] PAYTM CREATE-TRANSACTION STARTED`);
-    console.log(`📋 [${requestId}] REQUEST DETAILS:`);
-    console.log(`   Method: ${req.method}`);
-    console.log(`   URL: ${req.originalUrl}`);
-    console.log(`   Headers:`, JSON.stringify(req.headers, null, 2));
-    console.log(`   Body:`, JSON.stringify(req.body, null, 2));
-    console.log(`   Content-Type: ${req.get('Content-Type')}`);
-    console.log(`   User-Agent: ${req.get('User-Agent')}`);
+    console.log(`🚀 [${requestId}] PAYTM CREATE-TRANSACTION STARTED`);
+    console.log(`📋 [${requestId}] REQUEST:`, JSON.stringify(req.body, null, 2));
 
     const { orderId, amount, restaurantSlug, customerEmail, customerPhone } = req.body;
 
-    // Enhanced validation with detailed logging
-    console.log(`\n🔍 [${requestId}] VALIDATION CHECK:`);
-    console.log(`   orderId: "${orderId}" (type: ${typeof orderId})`);
-    console.log(`   amount: "${amount}" (type: ${typeof amount})`);
-    console.log(`   restaurantSlug: "${restaurantSlug}" (type: ${typeof restaurantSlug})`);
-    console.log(`   customerEmail: "${customerEmail}" (type: ${typeof customerEmail})`);
-    console.log(`   customerPhone: "${customerPhone}" (type: ${typeof customerPhone})`);
-
-    if (!orderId) {
-      console.error(`❌ [${requestId}] VALIDATION FAILED: Missing orderId`);
-      return errorResponse(res, 400, 'Order ID is required');
+    // Validation
+    if (!orderId || !amount || !restaurantSlug) {
+      const missing = [];
+      if (!orderId) missing.push('orderId');
+      if (!amount) missing.push('amount');
+      if (!restaurantSlug) missing.push('restaurantSlug');
+      
+      console.error(`❌ [${requestId}] VALIDATION FAILED: Missing ${missing.join(', ')}`);
+      return errorResponse(res, 400, `Missing required fields: ${missing.join(', ')}`);
     }
 
-    if (!amount) {
-      console.error(`❌ [${requestId}] VALIDATION FAILED: Missing amount`);
-      return errorResponse(res, 400, 'Amount is required');
-    }
-
-    if (!restaurantSlug) {
-      console.error(`❌ [${requestId}] VALIDATION FAILED: Missing restaurantSlug`);
-      return errorResponse(res, 400, 'Restaurant slug is required');
-    }
-
-    // Validate amount is a valid number
     const numericAmount = parseFloat(amount);
     if (isNaN(numericAmount) || numericAmount <= 0) {
-      console.error(`❌ [${requestId}] VALIDATION FAILED: Invalid amount: ${amount}`);
+      console.error(`❌ [${requestId}] INVALID AMOUNT: ${amount}`);
       return errorResponse(res, 400, 'Amount must be a valid positive number');
     }
-
-    console.log(`✅ [${requestId}] VALIDATION PASSED - Processing payment request`);
-      console.error('❌ VALIDATION FAILED: Invalid amount:', amount);
-      return errorResponse(res, 400, 'Amount must be a valid positive number');
-    }
-
-    console.log('✅ VALIDATION PASSED - Processing payment request');
 
     // Get order
     const order = await OrderRepository.findById(orderId);
     if (!order) {
+      console.error(`❌ [${requestId}] ORDER NOT FOUND: ${orderId}`);
       return errorResponse(res, 404, 'Order not found');
     }
 
     // Get tenant
     const tenant = await TenantRepository.findBySlug(restaurantSlug);
     if (!tenant || tenant.id !== order.tenant_id) {
+      console.error(`❌ [${requestId}] TENANT MISMATCH`);
       return errorResponse(res, 404, 'Restaurant not found or order mismatch');
     }
 
-    // Get Paytm payment config from database (configured via admin panel)
-    const paymentConfig = await PaymentProviderRepository.findByTenant(tenant.id, 'paytm');
-    if (!paymentConfig) {
-      console.error('No Paytm configuration found for tenant:', tenant.id);
-      return errorResponse(res, 400, 'Paytm payment not configured. Please configure Paytm in the admin panel under Payments section.');
+    // Get Paytm config
+    const paytmConfig = await PaymentProviderRepository.findByTenant(tenant.id, 'paytm');
+    if (!paytmConfig || !paytmConfig.key_id || !paytmConfig.key_secret) {
+      console.error(`❌ [${requestId}] PAYTM CONFIG INVALID`);
+      return errorResponse(res, 400, 'Paytm payment not configured');
     }
 
-    // Validate Paytm credentials
-    if (!paymentConfig.key_id || !paymentConfig.key_secret) {
-      console.error('Invalid Paytm configuration for tenant:', tenant.id, {
-        hasKeyId: !!paymentConfig.key_id,
-        hasKeySecret: !!paymentConfig.key_secret
-      });
-      return errorResponse(res, 400, 'Invalid Paytm configuration. Please check your Paytm credentials in the admin panel.');
+    if (!paytmConfig.is_active) {
+      console.error(`❌ [${requestId}] PAYTM CONFIG INACTIVE`);
+      return errorResponse(res, 400, 'Paytm payment is currently disabled');
     }
 
-    console.log('Using Paytm config from database:', {
-      tenantId: tenant.id,
-      merchantId: paymentConfig.key_id,
-      website: paymentConfig.website || 'WEBSTAGING',
-      configId: paymentConfig.id
-    });
+    // Validate merchant key length (Paytm keys should be 32 characters)
+    if (paytmConfig.key_secret.length < 16) {
+      console.error(`❌ [${requestId}] INVALID KEY LENGTH: ${paytmConfig.key_secret.length} chars`);
+      return errorResponse(res, 400, 'Invalid Paytm merchant key. Please check your configuration.');
+    }
 
-    // Generate callback URL
-    const callbackUrl = `${process.env.BASE_URL || 'http://localhost:3000'}/api/paytm/callback`;
+    console.log(`✅ [${requestId}] CONFIG VALID - MID: ${paytmConfig.key_id}, Key Length: ${paytmConfig.key_secret.length}`);
 
     // Create transaction token
-    const tokenResponse = await PaytmService.createTransactionToken(
-      {
-        merchantId: paymentConfig.key_id,
-        merchantKey: paymentConfig.key_secret,
-        website: paymentConfig.website || 'WEBSTAGING',
-        callbackUrl
-      },
-      {
-        orderId: orderId,
-        amount: parseFloat(amount),
-        customerId: order.table_id || 'guest'
-      }
-    );
+    const callbackUrl = `${process.env.BASE_URL || 'https://dineflow-backend-hya7.onrender.com'}/api/paytm/callback`;
+    
+    try {
+      const tokenResponse = await PaytmService.createTransactionToken(
+        {
+          merchantId: paytmConfig.key_id,
+          merchantKey: paytmConfig.key_secret,
+          website: paytmConfig.website || 'WEBSTAGING',
+          callbackUrl
+        },
+        {
+          orderId: orderId,
+          amount: numericAmount,
+          customerId: order.table_id || 'guest'
+        }
+      );
 
-    if (!tokenResponse.body || !tokenResponse.body.txnToken) {
-      console.error('Paytm token response:', tokenResponse);
-      return errorResponse(res, 500, 'Failed to create transaction token. Please check your Paytm configuration.');
+      console.log(`📡 [${requestId}] PAYTM RESPONSE:`, tokenResponse?.body?.resultInfo?.resultStatus);
+
+      if (!tokenResponse?.body?.txnToken) {
+        console.error(`❌ [${requestId}] NO TOKEN IN RESPONSE:`, tokenResponse);
+        return errorResponse(res, 500, 'Failed to create transaction token');
+      }
+
+      // Update order
+      await OrderRepository.updateById(orderId, {
+        payment_provider: 'paytm',
+        payment_order_id: orderId
+      });
+
+      const response = {
+        orderId: orderId,
+        amount: numericAmount,
+        txnToken: tokenResponse.body.txnToken,
+        merchantId: paytmConfig.key_id,
+        website: paytmConfig.website || 'WEBSTAGING',
+        currency: 'INR',
+        restaurantName: tenant.name
+      };
+
+      console.log(`✅ [${requestId}] SUCCESS`);
+      return successResponse(res, 201, response, 'Transaction token created successfully');
+
+    } catch (paytmError) {
+      console.error(`❌ [${requestId}] PAYTM API ERROR:`, paytmError.message);
+      
+      // Check if it's a key validation error
+      if (paytmError.message.includes('Invalid key length') || paytmError.message.includes('key')) {
+        return errorResponse(res, 400, 'Invalid Paytm merchant key configuration. Please verify your Paytm credentials in admin panel.');
+      }
+      
+      return errorResponse(res, 500, 'Paytm service temporarily unavailable');
     }
 
-    // Update order with payment provider info
+  } catch (error) {
+    console.error(`❌ [${requestId}] ERROR:`, error.message);
+    return errorResponse(res, 500, 'Internal server error');
+  }
+});
+
+/**
+ * Create Paytm UPI payment order
+ * POST /api/paytm/create-order
+ */
+router.post('/create-order', async (req, res) => {
+  const requestId = 'ord_' + Date.now();
+  
+  try {
+    console.log(`🚀 [${requestId}] PAYTM CREATE-ORDER STARTED`);
+    console.log(`📋 [${requestId}] REQUEST:`, JSON.stringify(req.body, null, 2));
+
+    const { orderId, restaurantSlug, customerEmail, customerPhone } = req.body;
+
+    // Validation
+    if (!orderId || !restaurantSlug) {
+      const missing = [];
+      if (!orderId) missing.push('orderId');
+      if (!restaurantSlug) missing.push('restaurantSlug');
+      
+      console.error(`❌ [${requestId}] VALIDATION FAILED: Missing ${missing.join(', ')}`);
+      return errorResponse(res, 400, `Missing required fields: ${missing.join(', ')}`);
+    }
+
+    // Get order
+    const order = await OrderRepository.findById(orderId);
+    if (!order) {
+      console.error(`❌ [${requestId}] ORDER NOT FOUND: ${orderId}`);
+      return errorResponse(res, 404, 'Order not found');
+    }
+
+    // Get tenant
+    const tenant = await TenantRepository.findBySlug(restaurantSlug);
+    if (!tenant || tenant.id !== order.tenant_id) {
+      console.error(`❌ [${requestId}] TENANT MISMATCH`);
+      return errorResponse(res, 404, 'Restaurant not found or order mismatch');
+    }
+
+    // Get Paytm config
+    const paytmConfig = await PaymentProviderRepository.findByTenant(tenant.id, 'paytm');
+    if (!paytmConfig || !paytmConfig.key_id || !paytmConfig.key_secret) {
+      console.error(`❌ [${requestId}] PAYTM CONFIG INVALID`);
+      return errorResponse(res, 400, 'Paytm payment not configured');
+    }
+
+    if (!paytmConfig.is_active) {
+      console.error(`❌ [${requestId}] PAYTM CONFIG INACTIVE`);
+      return errorResponse(res, 400, 'Paytm payment is currently disabled');
+    }
+
+    console.log(`✅ [${requestId}] CONFIG VALID`);
+
+    // Create UPI payment data
+    const merchantUpiId = `${paytmConfig.key_id}@paytm`;
+    const upiString = `upi://pay?pa=${merchantUpiId}&pn=${encodeURIComponent(tenant.name)}&am=${order.total_amount}&cu=INR&tn=Order%20${orderId}`;
+    
+    // Update order
     await OrderRepository.updateById(orderId, {
       payment_provider: 'paytm',
       payment_order_id: orderId
     });
 
-    // Return transaction token for CheckoutJS
-    successResponse(res, 201, {
+    const response = {
       orderId: orderId,
-      amount: parseFloat(amount),
-      txnToken: tokenResponse.body.txnToken,
-      merchantId: paymentConfig.key_id,
-      website: paymentConfig.website || 'WEBSTAGING'
-    });
+      amount: order.total_amount,
+      currency: 'INR',
+      merchantUpiId: merchantUpiId,
+      merchantName: tenant.name,
+      upiString: upiString,
+      qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiString)}`
+    };
+
+    console.log(`✅ [${requestId}] UPI PAYMENT CREATED`);
+    return successResponse(res, 201, response, 'UPI payment created successfully');
+
   } catch (error) {
-    console.error('Create Paytm transaction error:', error);
-    console.error('Error stack:', error.stack);
-    errorResponse(res, 500, 'Internal server error', error.message);
+    console.error(`❌ [${requestId}] ERROR:`, error.message);
+    return errorResponse(res, 500, 'Internal server error');
   }
 });
 
 /**
- * Create Paytm payment order (Legacy UPI method)
- * POST /api/paytm/create-order
- * Body: { orderId, restaurantSlug, customerEmail, customerPhone }
+ * Verify payment status (with rate limiting)
+ * POST /api/paytm/verify
  */
-router.post('/create-order', async (req, res) => {
+router.post('/verify', async (req, res) => {
+  const requestId = 'ver_' + Date.now();
+  const clientIp = req.ip || req.connection.remoteAddress;
+  
   try {
-    const { orderId, restaurantSlug, customerEmail, customerPhone } = req.body;
+    // Simple rate limiting - max 1 request per second per IP
+    const now = Date.now();
+    const rateLimitKey = `verify_${clientIp}`;
+    
+    if (!global.rateLimitCache) {
+      global.rateLimitCache = new Map();
+    }
+    
+    const lastRequest = global.rateLimitCache.get(rateLimitKey);
+    if (lastRequest && (now - lastRequest) < 1000) {
+      return errorResponse(res, 429, 'Too many requests. Please wait before checking again.');
+    }
+    
+    global.rateLimitCache.set(rateLimitKey, now);
+    
+    // Clean up old entries every 100 requests
+    if (global.rateLimitCache.size > 100) {
+      const cutoff = now - 60000; // 1 minute ago
+      for (const [key, timestamp] of global.rateLimitCache.entries()) {
+        if (timestamp < cutoff) {
+          global.rateLimitCache.delete(key);
+        }
+      }
+    }
+
+    const { orderId, restaurantSlug } = req.body;
 
     if (!orderId || !restaurantSlug) {
       return errorResponse(res, 400, 'Order ID and restaurant slug are required');
@@ -170,61 +270,25 @@ router.post('/create-order', async (req, res) => {
       return errorResponse(res, 404, 'Restaurant not found or order mismatch');
     }
 
-    // Get Paytm payment config
-    const paymentConfig = await PaymentProviderRepository.findByTenant(tenant.id, 'paytm');
-    if (!paymentConfig) {
-      return errorResponse(res, 400, 'Paytm payment not configured for this restaurant');
-    }
-
-    // Validate Paytm credentials
-    if (!paymentConfig.key_id || !paymentConfig.key_secret) {
-      return errorResponse(res, 400, 'Invalid Paytm configuration');
-    }
-
-    // Generate callback URL
-    const callbackUrl = `${process.env.BASE_URL || 'http://localhost:3000'}/api/paytm/callback`;
-
-    // Create UPI payment data
-    const upiPaymentData = await PaytmService.createUpiPaymentData(
-      {
-        merchantId: paymentConfig.key_id,
-        merchantKey: paymentConfig.key_secret,
-        website: 'WEBSTAGING',
-        channelId: 'WEB',
-        industryType: 'Retail'
-      },
-      {
-        orderId: orderId,
-        amount: order.total_amount.toString(),
-        customerId: order.table_id || 'guest',
-        customerEmail: customerEmail || 'customer@dineflow.com',
-        customerPhone: customerPhone || '9999999999',
-        callbackUrl
-      }
-    );
-
-    // Update order with payment provider info
-    await OrderRepository.updateById(orderId, {
-      payment_provider: 'paytm',
-      payment_order_id: orderId
-    });
-
-    // Return UPI payment data for QR code and direct UPI payments
-    successResponse(res, 201, {
-      orderId: orderId,
+    const response = {
+      orderId,
+      paymentStatus: order.payment_status,
+      orderStatus: order.status,
       amount: order.total_amount,
-      currency: 'INR',
-      merchantUpiId: upiPaymentData.merchantUpiId,
-      merchantName: upiPaymentData.merchantName,
-      qrCodeUrl: upiPaymentData.qrCodeData,
-      upiString: upiPaymentData.upiString,
-      // Keep original params for fallback redirect
-      paymentParams: upiPaymentData.paymentParams,
-      gatewayUrl: PaytmService.getGatewayUrl('staging')
-    });
+      transactionId: order.payment_id,
+      isPaid: order.payment_status === 'completed'
+    };
+
+    // Only log successful payments to reduce noise
+    if (response.isPaid) {
+      console.log(`✅ [${requestId}] PAYMENT COMPLETED: ${orderId}`);
+    }
+    
+    return successResponse(res, 200, response);
+
   } catch (error) {
-    console.error('Create Paytm order error:', error);
-    errorResponse(res, 500, 'Internal server error', error.message);
+    console.error(`❌ [${requestId}] ERROR:`, error.message);
+    return errorResponse(res, 500, 'Internal server error');
   }
 });
 
@@ -233,7 +297,12 @@ router.post('/create-order', async (req, res) => {
  * POST /api/paytm/callback
  */
 router.post('/callback', async (req, res) => {
+  const requestId = 'cb_' + Date.now();
+  
   try {
+    console.log(`🚀 [${requestId}] PAYTM CALLBACK`);
+    console.log(`📋 [${requestId}] DATA:`, JSON.stringify(req.body, null, 2));
+
     const response = req.body;
     const { ORDERID, CHECKSUMHASH } = response;
 
@@ -253,21 +322,21 @@ router.post('/callback', async (req, res) => {
       return errorResponse(res, 404, 'Restaurant not found');
     }
 
-    // Get Paytm payment config
+    // Get Paytm config
     const paymentConfig = await PaymentProviderRepository.findByTenant(tenant.id, 'paytm');
     if (!paymentConfig) {
       return errorResponse(res, 400, 'Paytm payment not configured');
     }
 
-    // Verify checksum using new method
+    // Verify checksum
     const verificationResult = await PaytmService.verifyPaymentCallback(response, paymentConfig.key_secret);
 
     if (!verificationResult.isValid) {
-      console.error('Invalid checksum for order:', ORDERID);
+      console.error(`❌ [${requestId}] INVALID CHECKSUM`);
       return errorResponse(res, 400, 'Invalid payment signature');
     }
 
-    // Update order based on payment status
+    // Update order
     const paymentStatus = verificationResult.status === 'TXN_SUCCESS' ? 'completed' : 'failed';
     const orderStatus = verificationResult.status === 'TXN_SUCCESS' ? 'confirmed' : 'cancelled';
 
@@ -278,155 +347,48 @@ router.post('/callback', async (req, res) => {
       payment_order_id: verificationResult.orderId
     });
 
+    console.log(`✅ [${requestId}] ORDER UPDATED: ${orderStatus}`);
+
     // Send kitchen notification if payment successful
     if (paymentStatus === 'completed') {
-      const io = req.app?.get('io');
-      if (io) {
-        const orderItems = await OrderItemRepository.findByOrder(ORDERID);
-        const table = await RestaurantTableRepository.findById(order.table_id);
-        
-        io.to(`tenant-${tenant.id}`).emit('new-order', {
-          orderId: ORDERID,
-          tableId: order.table_id,
-          tableName: table?.name || 'Unknown',
-          status: orderStatus,
-          totalAmount: order.total_amount,
-          items: orderItems.map(item => ({
-            name: item.name_snapshot,
-            quantity: item.quantity,
-            price: item.price_snapshot
-          })),
-          createdAt: order.created_at
-        });
-        
-        io.to(`kitchen-${tenant.id}`).emit('kitchen-order', {
-          orderId: ORDERID,
-          tableId: order.table_id,
-          tableName: table?.name || 'Unknown',
-          items: orderItems,
-          createdAt: order.created_at
-        });
+      try {
+        const io = req.app?.get('io');
+        if (io) {
+          const orderItems = await OrderItemRepository.findByOrder(ORDERID);
+          const table = await RestaurantTableRepository.findById(order.table_id);
+          
+          io.to(`tenant-${tenant.id}`).emit('new-order', {
+            orderId: ORDERID,
+            tableId: order.table_id,
+            tableName: table?.name || 'Unknown',
+            status: orderStatus,
+            totalAmount: order.total_amount,
+            items: orderItems.map(item => ({
+              name: item.name_snapshot,
+              quantity: item.quantity,
+              price: item.price_snapshot
+            })),
+            createdAt: order.created_at
+          });
+          
+          console.log(`✅ [${requestId}] KITCHEN NOTIFICATION SENT`);
+        }
+      } catch (notificationError) {
+        console.error(`⚠️ [${requestId}] NOTIFICATION ERROR:`, notificationError);
       }
-
-      // Send confirmation email
-      EmailService.sendPaymentConfirmation(
-        tenant.id,
-        order,
-        verificationResult.transactionId,
-        tenant.name
-      ).catch(err => console.error('Email send failed:', err));
     }
 
-    // Return success response
-    successResponse(res, 200, {
+    return successResponse(res, 200, {
       orderId: ORDERID,
       transactionId: verificationResult.transactionId,
       status: verificationResult.status,
       paymentStatus,
       message: verificationResult.responseMessage
     });
+
   } catch (error) {
-    console.error('Paytm callback error:', error);
-    errorResponse(res, 500, 'Internal server error', error.message);
-  }
-});
-
-/**
- * Check payment status
- * GET /api/paytm/status/:orderId
- */
-router.get('/status/:orderId', async (req, res) => {
-  try {
-    const { orderId } = req.params;
-
-    // Get order
-    const order = await OrderRepository.findById(orderId);
-    if (!order) {
-      return errorResponse(res, 404, 'Order not found');
-    }
-
-    // Get tenant
-    const tenant = await TenantRepository.findById(order.tenant_id);
-    if (!tenant) {
-      return errorResponse(res, 404, 'Restaurant not found');
-    }
-
-    // Get Paytm payment config
-    const paymentConfig = await PaymentProviderRepository.findByTenant(tenant.id, 'paytm');
-    if (!paymentConfig) {
-      return errorResponse(res, 400, 'Paytm payment not configured');
-    }
-
-    // Check transaction status with Paytm
-    try {
-      const statusResponse = await PaytmService.checkTransactionStatus(
-        {
-          merchantId: paymentConfig.key_id,
-          merchantKey: paymentConfig.key_secret
-        },
-        orderId
-      );
-
-      successResponse(res, 200, {
-        orderId,
-        status: statusResponse.body?.resultInfo?.resultStatus,
-        transactionId: statusResponse.body?.txnId,
-        amount: statusResponse.body?.txnAmount,
-        responseCode: statusResponse.body?.resultInfo?.resultCode,
-        responseMessage: statusResponse.body?.resultInfo?.resultMsg
-      });
-    } catch (paytmError) {
-      console.error('Paytm status check error:', paytmError);
-      // Return local order status if Paytm check fails
-      successResponse(res, 200, {
-        orderId,
-        paymentStatus: order.payment_status,
-        orderStatus: order.status,
-        amount: order.total_amount
-      });
-    }
-  } catch (error) {
-    console.error('Check payment status error:', error);
-    errorResponse(res, 500, 'Internal server error', error.message);
-  }
-});
-
-/**
- * Verify payment (alternative endpoint for frontend verification)
- * POST /api/paytm/verify
- */
-router.post('/verify', async (req, res) => {
-  try {
-    const { orderId, restaurantSlug } = req.body;
-
-    if (!orderId || !restaurantSlug) {
-      return errorResponse(res, 400, 'Order ID and restaurant slug are required');
-    }
-
-    // Get order
-    const order = await OrderRepository.findById(orderId);
-    if (!order) {
-      return errorResponse(res, 404, 'Order not found');
-    }
-
-    // Get tenant
-    const tenant = await TenantRepository.findBySlug(restaurantSlug);
-    if (!tenant || tenant.id !== order.tenant_id) {
-      return errorResponse(res, 404, 'Restaurant not found or order mismatch');
-    }
-
-    // Return current payment status
-    successResponse(res, 200, {
-      orderId,
-      paymentStatus: order.payment_status,
-      orderStatus: order.status,
-      amount: order.total_amount,
-      transactionId: order.payment_id,
-      isPaid: order.payment_status === 'completed'
-    });
-  } catch (error) {
-    console.error('Verify payment error:', error);
-    errorResponse(res, 500, 'Internal server error', error.message);
+    console.error(`❌ [${requestId}] ERROR:`, error.message);
+    return errorResponse(res, 500, 'Internal server error');
   }
 });
 
