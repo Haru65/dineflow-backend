@@ -24,6 +24,27 @@ router.post('/login', async (req, res) => {
       return errorResponse(res, 400, 'Invalid email format');
     }
 
+    // Hardcoded superadmin - doesn't require database
+    const SUPERADMIN_EMAIL = process.env.SUPERADMIN_EMAIL || 'admin@dineflow.com';
+    const SUPERADMIN_PASSWORD = process.env.SUPERADMIN_PASSWORD || 'admin123';
+    
+    if (email === SUPERADMIN_EMAIL && password === SUPERADMIN_PASSWORD) {
+      const token = generateToken('superadmin-hardcoded', email, 'superadmin', null);
+      
+      return successResponse(res, 200, {
+        token,
+        user: {
+          id: 'superadmin-hardcoded',
+          email: email,
+          name: 'Super Admin',
+          role: 'superadmin',
+          tenantId: null,
+          tenant: null
+        }
+      }, 'Login successful');
+    }
+
+    // Regular user login from database
     const user = await UserRepository.findByEmail(email);
     if (!user) {
       return errorResponse(res, 401, 'Invalid credentials');
