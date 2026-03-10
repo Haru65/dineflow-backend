@@ -34,38 +34,28 @@ router.post('/create-transaction', async (req, res) => {
       return errorResponse(res, 404, 'Restaurant not found or order mismatch');
     }
 
-    // Get Paytm payment config
-    let paymentConfig = await PaymentProviderRepository.findByTenant(tenant.id, 'paytm');
-    
-    // If no config exists, create one with environment variables
+    // Get Paytm payment config from database (configured via admin panel)
+    const paymentConfig = await PaymentProviderRepository.findByTenant(tenant.id, 'paytm');
     if (!paymentConfig) {
-      console.log('No Paytm config found, creating from environment variables...');
-      
-      const paytmMid = process.env.PAYTM_MID;
-      const paytmKey = process.env.PAYTM_KEY;
-      
-      if (!paytmMid || !paytmKey) {
-        return errorResponse(res, 400, 'Paytm payment not configured. Please contact administrator.');
-      }
-      
-      // Create config
-      const configId = await PaymentProviderRepository.create({
-        tenant_id: tenant.id,
-        provider: 'paytm',
-        key_id: paytmMid,
-        key_secret: paytmKey,
-        webhook_secret: null,
-        is_active: 1
-      });
-      
-      paymentConfig = await PaymentProviderRepository.findByTenant(tenant.id, 'paytm');
-      console.log('Paytm config created:', configId);
+      console.error('No Paytm configuration found for tenant:', tenant.id);
+      return errorResponse(res, 400, 'Paytm payment not configured. Please configure Paytm in the admin panel under Payments section.');
     }
 
     // Validate Paytm credentials
     if (!paymentConfig.key_id || !paymentConfig.key_secret) {
-      return errorResponse(res, 400, 'Invalid Paytm configuration');
+      console.error('Invalid Paytm configuration for tenant:', tenant.id, {
+        hasKeyId: !!paymentConfig.key_id,
+        hasKeySecret: !!paymentConfig.key_secret
+      });
+      return errorResponse(res, 400, 'Invalid Paytm configuration. Please check your Paytm credentials in the admin panel.');
     }
+
+    console.log('Using Paytm config from database:', {
+      tenantId: tenant.id,
+      merchantId: paymentConfig.key_id,
+      website: paymentConfig.website || 'WEBSTAGING',
+      configId: paymentConfig.id
+    });
 
     // Generate callback URL
     const callbackUrl = `${process.env.BASE_URL || 'http://localhost:3000'}/api/paytm/callback`;
@@ -75,7 +65,7 @@ router.post('/create-transaction', async (req, res) => {
       {
         merchantId: paymentConfig.key_id,
         merchantKey: paymentConfig.key_secret,
-        website: process.env.PAYTM_WEBSITE || 'WEBSTAGING',
+        website: paymentConfig.website || 'WEBSTAGING',
         callbackUrl
       },
       {
@@ -87,7 +77,7 @@ router.post('/create-transaction', async (req, res) => {
 
     if (!tokenResponse.body || !tokenResponse.body.txnToken) {
       console.error('Paytm token response:', tokenResponse);
-      return errorResponse(res, 500, 'Failed to create transaction token');
+      return errorResponse(res, 500, 'Failed to create transaction token. Please check your Paytm configuration.');
     }
 
     // Update order with payment provider info
@@ -102,7 +92,7 @@ router.post('/create-transaction', async (req, res) => {
       amount: parseFloat(amount),
       txnToken: tokenResponse.body.txnToken,
       merchantId: paymentConfig.key_id,
-      website: process.env.PAYTM_WEBSITE || 'WEBSTAGING'
+      website: paymentConfig.website || 'WEBSTAGING'
     });
   } catch (error) {
     console.error('Create Paytm transaction error:', error);

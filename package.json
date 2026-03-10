@@ -14,6 +14,11 @@
     "fix-constraint": "node fix-production-constraint.js",
     "setup-paytm": "node setup-paytm-config.js",
     "fix-paytm-setup": "node fix-paytm-setup.js",
+    "debug-paytm": "node debug-paytm-config.js",
+    "debug-admin-config": "node debug-admin-config.js",
+    "test-paytm": "node test-paytm-transaction.js",
+    "test-payment-flow": "node test-complete-payment-flow.js",
+    "check-state": "node check-current-state.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
