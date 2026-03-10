@@ -15,12 +15,56 @@ const EmailService = require('../utils/emailService');
  * Body: { orderId, amount, restaurantSlug, customerEmail, customerPhone }
  */
 router.post('/create-transaction', async (req, res) => {
+  const requestId = 'txn_' + Date.now();
+  
   try {
+    console.log(`\n🚀 [${requestId}] PAYTM CREATE-TRANSACTION STARTED`);
+    console.log(`📋 [${requestId}] REQUEST DETAILS:`);
+    console.log(`   Method: ${req.method}`);
+    console.log(`   URL: ${req.originalUrl}`);
+    console.log(`   Headers:`, JSON.stringify(req.headers, null, 2));
+    console.log(`   Body:`, JSON.stringify(req.body, null, 2));
+    console.log(`   Content-Type: ${req.get('Content-Type')}`);
+    console.log(`   User-Agent: ${req.get('User-Agent')}`);
+
     const { orderId, amount, restaurantSlug, customerEmail, customerPhone } = req.body;
 
-    if (!orderId || !amount || !restaurantSlug) {
-      return errorResponse(res, 400, 'Order ID, amount, and restaurant slug are required');
+    // Enhanced validation with detailed logging
+    console.log(`\n🔍 [${requestId}] VALIDATION CHECK:`);
+    console.log(`   orderId: "${orderId}" (type: ${typeof orderId})`);
+    console.log(`   amount: "${amount}" (type: ${typeof amount})`);
+    console.log(`   restaurantSlug: "${restaurantSlug}" (type: ${typeof restaurantSlug})`);
+    console.log(`   customerEmail: "${customerEmail}" (type: ${typeof customerEmail})`);
+    console.log(`   customerPhone: "${customerPhone}" (type: ${typeof customerPhone})`);
+
+    if (!orderId) {
+      console.error(`❌ [${requestId}] VALIDATION FAILED: Missing orderId`);
+      return errorResponse(res, 400, 'Order ID is required');
     }
+
+    if (!amount) {
+      console.error(`❌ [${requestId}] VALIDATION FAILED: Missing amount`);
+      return errorResponse(res, 400, 'Amount is required');
+    }
+
+    if (!restaurantSlug) {
+      console.error(`❌ [${requestId}] VALIDATION FAILED: Missing restaurantSlug`);
+      return errorResponse(res, 400, 'Restaurant slug is required');
+    }
+
+    // Validate amount is a valid number
+    const numericAmount = parseFloat(amount);
+    if (isNaN(numericAmount) || numericAmount <= 0) {
+      console.error(`❌ [${requestId}] VALIDATION FAILED: Invalid amount: ${amount}`);
+      return errorResponse(res, 400, 'Amount must be a valid positive number');
+    }
+
+    console.log(`✅ [${requestId}] VALIDATION PASSED - Processing payment request`);
+      console.error('❌ VALIDATION FAILED: Invalid amount:', amount);
+      return errorResponse(res, 400, 'Amount must be a valid positive number');
+    }
+
+    console.log('✅ VALIDATION PASSED - Processing payment request');
 
     // Get order
     const order = await OrderRepository.findById(orderId);
