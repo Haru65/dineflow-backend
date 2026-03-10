@@ -20,6 +20,9 @@
     "test-paytm": "node test-paytm-transaction.js",
     "test-payment-flow": "node test-complete-payment-flow.js",
     "check-state": "node check-current-state.js",
+    "update-menu-images": "node scripts/simple-menu-images.js update",
+    "menu-image-status": "node scripts/simple-menu-images.js status",
+    "test-image-api": "node scripts/test-image-fetching.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {

@@ -1,10 +1,11 @@
 const { dbRun, dbGet, dbAll } = require('../database-postgres');
 const { generateId } = require('../utils/helpers');
+const imageService = require('../utils/imageService');
 
 class MenuItemRepository {
   async create(itemData) {
     const id = generateId();
-    const {
+    let {
       tenant_id,
       category_id,
       name,
@@ -17,6 +18,18 @@ class MenuItemRepository {
       tags = '',
       preparation_time = null
     } = itemData;
+
+    // Auto-fetch image if not provided
+    if (!image_url && name) {
+      try {
+        console.log(`🖼️ Auto-fetching image for new menu item: ${name}`);
+        image_url = await imageService.autoFetchImageForMenuItem(name);
+        console.log(`✅ Auto-assigned image: ${image_url}`);
+      } catch (error) {
+        console.error(`⚠️ Failed to auto-fetch image for ${name}:`, error.message);
+        // Continue without image - don't fail the creation
+      }
+    }
 
     console.log('Creating menu item with data:', {
       id,
@@ -88,6 +101,75 @@ class MenuItemRepository {
 
   async deactivate(id) {
     await this.updateById(id, { is_available: 0 });
+  }
+
+  /**
+   * Auto-fetch and update image for existing menu item
+   */
+  async autoUpdateImage(id) {
+    try {
+      const item = await this.findById(id);
+      if (!item) {
+        throw new Error('Menu item not found');
+      }
+
+      if (item.image_url) {
+        console.log(`Item ${item.name} already has image: ${item.image_url}`);
+        return item.image_url;
+      }
+
+      console.log(`🖼️ Auto-fetching image for existing item: ${item.name}`);
+      const imageUrl = await imageService.autoFetchImageForMenuItem(item.name);
+      
+      if (imageUrl) {
+        await this.updateById(id, { image_url: imageUrl });
+        console.log(`✅ Updated ${item.name} with image: ${imageUrl}`);
+        return imageUrl;
+      }
+
+      return null;
+    } catch (error) {
+      console.error(`Error auto-updating image for item ${id}:`, error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Bulk update images for items without images
+   */
+  async bulkUpdateMissingImages(tenantId = null) {
+    try {
+      let query = 'SELECT id, name FROM menu_items WHERE is_available = 1 AND (image_url IS NULL OR image_url = \'\')';
+      let params = [];
+      
+      if (tenantId) {
+        query += ' AND tenant_id = $1';
+        params = [tenantId];
+      }
+
+      const itemsWithoutImages = await dbAll(query, params);
+      
+      console.log(`Found ${itemsWithoutImages.length} items without images`);
+      
+      const results = [];
+      for (const item of itemsWithoutImages) {
+        try {
+          const imageUrl = await this.autoUpdateImage(item.id);
+          results.push({ id: item.id, name: item.name, imageUrl, success: true });
+          
+          // Small delay to be respectful to APIs
+          await new Promise(resolve => setTimeout(resolve, 500));
+        } catch (error) {
+          console.error(`Failed to update image for ${item.name}:`, error.message);
+          results.push({ id: item.id, name: item.name, error: error.message, success: false });
+        }
+      }
+
+      return results;
+    } catch (error) {
+      console.error('Error in bulkUpdateMissingImages:', error);
+      throw error;
+    }
   }
 }
 
