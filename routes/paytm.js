@@ -35,9 +35,31 @@ router.post('/create-transaction', async (req, res) => {
     }
 
     // Get Paytm payment config
-    const paymentConfig = await PaymentProviderRepository.findByTenant(tenant.id, 'paytm');
+    let paymentConfig = await PaymentProviderRepository.findByTenant(tenant.id, 'paytm');
+    
+    // If no config exists, create one with environment variables
     if (!paymentConfig) {
-      return errorResponse(res, 400, 'Paytm payment not configured for this restaurant');
+      console.log('No Paytm config found, creating from environment variables...');
+      
+      const paytmMid = process.env.PAYTM_MID;
+      const paytmKey = process.env.PAYTM_KEY;
+      
+      if (!paytmMid || !paytmKey) {
+        return errorResponse(res, 400, 'Paytm payment not configured. Please contact administrator.');
+      }
+      
+      // Create config
+      const configId = await PaymentProviderRepository.create({
+        tenant_id: tenant.id,
+        provider: 'paytm',
+        key_id: paytmMid,
+        key_secret: paytmKey,
+        webhook_secret: null,
+        is_active: 1
+      });
+      
+      paymentConfig = await PaymentProviderRepository.findByTenant(tenant.id, 'paytm');
+      console.log('Paytm config created:', configId);
     }
 
     // Validate Paytm credentials
@@ -84,6 +106,7 @@ router.post('/create-transaction', async (req, res) => {
     });
   } catch (error) {
     console.error('Create Paytm transaction error:', error);
+    console.error('Error stack:', error.stack);
     errorResponse(res, 500, 'Internal server error', error.message);
   }
 });
