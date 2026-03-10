@@ -108,7 +108,7 @@ const runMigrations = async (client) => {
       table_id TEXT,
       source_type TEXT NOT NULL,
       source_reference TEXT,
-      status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'confirmed', 'cooking', 'ready', 'served', 'cancelled')),
+      status TEXT DEFAULT 'pending' CHECK(status IN ('draft', 'pending', 'confirmed', 'cooking', 'ready', 'served', 'cancelled')),
       payment_status TEXT DEFAULT 'pending' CHECK(payment_status IN ('pending', 'completed', 'failed', 'refunded')),
       payment_provider TEXT,
       payment_order_id TEXT,
