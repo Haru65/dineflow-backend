@@ -15,31 +15,31 @@ class PaymentProviderRepository {
 
     await dbRun(
       `INSERT INTO payment_providers (id, tenant_id, provider, key_id, key_secret, webhook_secret, is_active)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [id, tenant_id, provider, key_id, key_secret, webhook_secret, is_active]
     );
     return id;
   }
 
   async findById(id) {
-    return dbGet('SELECT * FROM payment_providers WHERE id = ?', [id]);
+    return dbGet('SELECT * FROM payment_providers WHERE id = $1', [id]);
   }
 
   async findByTenant(tenantId, provider = 'razorpay') {
     return dbGet(
-      'SELECT * FROM payment_providers WHERE tenant_id = ? AND provider = ? AND is_active = 1',
+      'SELECT * FROM payment_providers WHERE tenant_id = $1 AND provider = $2 AND is_active = 1',
       [tenantId, provider]
     );
   }
 
   async updateById(id, updates) {
     const fields = Object.keys(updates)
-      .map(key => `${key} = ?`)
+      .map(key => `${key} = $1`)
       .join(', ');
     const values = Object.values(updates);
 
     await dbRun(
-      `UPDATE payment_providers SET ${fields}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      `UPDATE payment_providers SET ${fields}, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
       [...values, id]
     );
   }

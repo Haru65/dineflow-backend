@@ -15,38 +15,38 @@ class ReceptionistQRRepository {
 
     await dbRun(
       `INSERT INTO receptionist_qr (id, tenant_id, name, identifier, qr_url, is_active)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+       VALUES ($1, $2, $3, $4, $5, $6)`,
       [id, tenant_id, name, identifier, qr_url, is_active]
     );
     return id;
   }
 
   async findById(id) {
-    return dbGet('SELECT * FROM receptionist_qr WHERE id = ?', [id]);
+    return dbGet('SELECT * FROM receptionist_qr WHERE id = $1', [id]);
   }
 
   async findByIdentifier(tenantId, identifier) {
     return dbGet(
-      'SELECT * FROM receptionist_qr WHERE tenant_id = ? AND identifier = ?',
+      'SELECT * FROM receptionist_qr WHERE tenant_id = $1 AND identifier = $2',
       [tenantId, identifier]
     );
   }
 
   async findByTenant(tenantId) {
     return dbAll(
-      'SELECT * FROM receptionist_qr WHERE tenant_id = ? ORDER BY created_at DESC',
+      'SELECT * FROM receptionist_qr WHERE tenant_id = $1 ORDER BY created_at DESC',
       [tenantId]
     );
   }
 
   async updateById(id, updates) {
     const fields = Object.keys(updates)
-      .map(key => `${key} = ?`)
+      .map(key => `${key} = $1`)
       .join(', ');
     const values = Object.values(updates);
 
     await dbRun(
-      `UPDATE receptionist_qr SET ${fields}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      `UPDATE receptionist_qr SET ${fields}, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
       [...values, id]
     );
   }

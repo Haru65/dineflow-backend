@@ -8,26 +8,26 @@ class RestaurantTableRepository {
 
     await dbRun(
       `INSERT INTO restaurant_tables (id, tenant_id, name, identifier, qr_url, is_active, table_type)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [id, tenant_id, name, identifier, qr_url, is_active, table_type]
     );
     return id;
   }
 
   async findById(id) {
-    return dbGet('SELECT * FROM restaurant_tables WHERE id = ?', [id]);
+    return dbGet('SELECT * FROM restaurant_tables WHERE id = $1', [id]);
   }
 
   async findByIdentifier(tenantId, identifier) {
     return dbGet(
-      'SELECT * FROM restaurant_tables WHERE tenant_id = ? AND identifier = ?',
+      'SELECT * FROM restaurant_tables WHERE tenant_id = $1 AND identifier = $2',
       [tenantId, identifier]
     );
   }
 
   async findByTenant(tenantId) {
     return dbAll(
-      'SELECT * FROM restaurant_tables WHERE tenant_id = ? AND is_active = 1 ORDER BY name',
+      'SELECT * FROM restaurant_tables WHERE tenant_id = $1 AND is_active = 1 ORDER BY name',
       [tenantId]
     );
   }
@@ -38,12 +38,12 @@ class RestaurantTableRepository {
 
   async updateById(id, updates) {
     const fields = Object.keys(updates)
-      .map(key => `${key} = ?`)
+      .map(key => `${key} = $1`)
       .join(', ');
     const values = Object.values(updates);
 
     await dbRun(
-      `UPDATE restaurant_tables SET ${fields}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      `UPDATE restaurant_tables SET ${fields}, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
       [...values, id]
     );
   }

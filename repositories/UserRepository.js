@@ -15,32 +15,32 @@ class UserRepository {
 
     await dbRun(
       `INSERT INTO users (id, tenant_id, email, password_hash, name, role, is_active)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [id, tenant_id, email, password_hash, name, role, is_active]
     );
     return id;
   }
 
   async findById(id) {
-    return dbGet('SELECT * FROM users WHERE id = ?', [id]);
+    return dbGet('SELECT * FROM users WHERE id = $1', [id]);
   }
 
   async findByEmail(email) {
-    return dbGet('SELECT * FROM users WHERE email = ?', [email]);
+    return dbGet('SELECT * FROM users WHERE email = $1', [email]);
   }
 
   async findByTenant(tenantId) {
-    return dbAll('SELECT * FROM users WHERE tenant_id = ? AND is_active = 1', [tenantId]);
+    return dbAll('SELECT * FROM users WHERE tenant_id = $1 AND is_active = 1', [tenantId]);
   }
 
   async updateById(id, updates) {
     const fields = Object.keys(updates)
-      .map(key => `${key} = ?`)
+      .map(key => `${key} = $1`)
       .join(', ');
     const values = Object.values(updates);
 
     await dbRun(
-      `UPDATE users SET ${fields}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      `UPDATE users SET ${fields}, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
       [...values, id]
     );
   }

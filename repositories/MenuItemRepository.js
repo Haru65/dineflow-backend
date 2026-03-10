@@ -36,7 +36,7 @@ class MenuItemRepository {
     try {
       await dbRun(
         `INSERT INTO menu_items (id, tenant_id, category_id, name, description, price, is_available, image_url, is_veg, is_spicy, tags, preparation_time)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
         [id, tenant_id, category_id, name, description, parseFloat(price), is_available, image_url, is_veg, is_spicy, tags, preparation_time]
       );
       console.log('Menu item created successfully with id:', id);
@@ -48,12 +48,12 @@ class MenuItemRepository {
   }
 
   async findById(id) {
-    return dbGet('SELECT * FROM menu_items WHERE id = ?', [id]);
+    return dbGet('SELECT * FROM menu_items WHERE id = $1', [id]);
   }
 
   async findByCategory(categoryId) {
     return dbAll(
-      'SELECT * FROM menu_items WHERE category_id = ? AND is_available = 1',
+      'SELECT * FROM menu_items WHERE category_id = $1 AND is_available = 1',
       [categoryId]
     );
   }
@@ -61,7 +61,7 @@ class MenuItemRepository {
   async findByTenant(tenantId) {
     return dbAll(
       `SELECT mi.* FROM menu_items mi
-       WHERE mi.tenant_id = ? AND mi.is_available = 1`,
+       WHERE mi.tenant_id = $1 AND mi.is_available = 1`,
       [tenantId]
     );
   }
@@ -69,19 +69,19 @@ class MenuItemRepository {
   async findByCategoryAndTenant(tenantId, categoryId) {
     return dbAll(
       `SELECT * FROM menu_items 
-       WHERE tenant_id = ? AND category_id = ? AND is_available = 1`,
+       WHERE tenant_id = $1 AND category_id = $2 AND is_available = 1`,
       [tenantId, categoryId]
     );
   }
 
   async updateById(id, updates) {
     const fields = Object.keys(updates)
-      .map(key => `${key} = ?`)
+      .map(key => `${key} = $1`)
       .join(', ');
     const values = Object.values(updates);
 
     await dbRun(
-      `UPDATE menu_items SET ${fields}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      `UPDATE menu_items SET ${fields}, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
       [...values, id]
     );
   }

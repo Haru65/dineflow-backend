@@ -5,7 +5,7 @@ class AgingRepository {
   static async getThresholds(tenantId) {
     const query = `
       SELECT * FROM aging_thresholds 
-      WHERE tenant_id = ? AND is_active = 1
+      WHERE tenant_id = $1 AND is_active = 1
     `;
     
     const row = await dbGet(query, [tenantId]);
@@ -18,7 +18,7 @@ class AgingRepository {
     const query = `
       INSERT OR REPLACE INTO aging_thresholds 
       (id, tenant_id, warning_minutes, critical_minutes, updated_at)
-      VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+      VALUES ($2, $3, $4, $5, CURRENT_TIMESTAMP)
     `;
     
     const result = await dbRun(query, [
@@ -40,7 +40,7 @@ class AgingRepository {
         at.critical_minutes
       FROM orders o
       LEFT JOIN aging_thresholds at ON o.tenant_id = at.tenant_id
-      WHERE o.tenant_id = ? 
+      WHERE o.tenant_id = $1 
       AND o.status IN ('pending', 'confirmed', 'cooking', 'ready')
       ORDER BY o.created_at DESC
     `;

@@ -15,31 +15,31 @@ class QuickActionsRepository {
 
     await dbRun(
       `INSERT INTO quick_actions (id, tenant_id, name, icon, price, is_active, sort_order)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [id, tenant_id, name, icon, price, is_active, sort_order]
     );
     return id;
   }
 
   async findById(id) {
-    return dbGet('SELECT * FROM quick_actions WHERE id = ?', [id]);
+    return dbGet('SELECT * FROM quick_actions WHERE id = $1', [id]);
   }
 
   async findByTenant(tenantId) {
     return dbAll(
-      'SELECT * FROM quick_actions WHERE tenant_id = ? AND is_active = 1 ORDER BY sort_order ASC',
+      'SELECT * FROM quick_actions WHERE tenant_id = $1 AND is_active = 1 ORDER BY sort_order ASC',
       [tenantId]
     );
   }
 
   async updateById(id, updates) {
     const fields = Object.keys(updates)
-      .map(key => `${key} = ?`)
+      .map(key => `${key} = $1`)
       .join(', ');
     const values = Object.values(updates);
 
     await dbRun(
-      `UPDATE quick_actions SET ${fields}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      `UPDATE quick_actions SET ${fields}, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
       [...values, id]
     );
   }
