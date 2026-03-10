@@ -157,6 +157,9 @@ const runMigrations = async (client) => {
       UNIQUE (tenant_id, provider)
     )`,
     
+    // Add website column to existing payment_providers table if it doesn't exist
+    `ALTER TABLE payment_providers ADD COLUMN IF NOT EXISTS website TEXT`,
+    
     // Integrations
     `CREATE TABLE IF NOT EXISTS integrations (
       id TEXT PRIMARY KEY,
