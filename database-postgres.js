@@ -149,6 +149,7 @@ const runMigrations = async (client) => {
       key_id TEXT NOT NULL,
       key_secret TEXT NOT NULL,
       webhook_secret TEXT,
+      website TEXT,
       is_active INTEGER DEFAULT 1,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

@@ -12,6 +12,7 @@
     "migrate": "node migrations/migrate.js",
     "migrate-postgres": "node migrations/run-postgres-migrations.js",
     "fix-constraint": "node fix-production-constraint.js",
+    "add-website-column": "node add-website-column.js",
     "setup-paytm": "node setup-paytm-config.js",
     "fix-paytm-setup": "node fix-paytm-setup.js",
     "debug-paytm": "node debug-paytm-config.js",
