@@ -23,6 +23,10 @@
     "update-menu-images": "node scripts/simple-menu-images.js update",
     "menu-image-status": "node scripts/simple-menu-images.js status",
     "test-image-api": "node scripts/test-image-fetching.js",
+    "test-google-images": "node test-google-images.js",
+    "test-free-images": "node test-google-images.js",
+    "test-db": "node test-db-connection.js",
+    "setup-postgres": "node setup-postgres-local.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {

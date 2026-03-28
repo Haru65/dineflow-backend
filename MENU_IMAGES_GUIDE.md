@@ -1,29 +1,108 @@
 # 🍽️ Menu Images Setup Guide
 
-This guide shows you how to automatically add food images to your menu items based on their dish names.
+Get professional food images for your menu items automatically! This system works immediately with free APIs - no Google Cloud Platform required.
 
-## Quick Start
+## 🚀 Quick Start (Works Right Now!)
 
-### 1. Check Current Status
-First, see which menu items currently have images:
+### 1. Test Current Setup
+Your system already works with free APIs:
+
+```bash
+npm run test-free-images
+```
+
+### 2. Check Menu Status
+See which items have images:
 
 ```bash
 npm run menu-image-status
 ```
 
-### 2. Update All Menu Items
-Add images to all menu items that don't have them:
+### 3. Add Images to All Items
+Automatically fetch images for all menu items:
 
 ```bash
 npm run update-menu-images
 ```
 
-### 3. Test the Image API
-Test if the image fetching is working:
+## 🎯 What You Get Out of the Box
 
-```bash
-npm run test-image-api
+### Default (No Setup Required)
+- **Foodish API**: Real food photos for common dishes
+- **Smart fallbacks**: Consistent placeholder images
+- **Works immediately**: No API keys needed
+
+### With Free APIs (5-minute setup)
+- **Unsplash**: Professional food photography (50 requests/hour free)
+- **Pexels**: High-quality stock photos (200 requests/hour free)
+- **Much better quality**: Restaurant-grade images
+
+## 🆓 Upgrade to Free Premium APIs
+
+### Option 1: Unsplash (Recommended)
+1. **Go to [Unsplash Developers](https://unsplash.com/developers)**
+2. **Create free account**
+3. **Create app**: "DineFlow Menu Images"
+4. **Copy Access Key**
+5. **Add to .env**:
+   ```env
+   UNSPLASH_ACCESS_KEY=your_access_key_here
+   ```
+
+### Option 2: Pexels (More requests)
+1. **Go to [Pexels API](https://www.pexels.com/api/)**
+2. **Create free account**
+3. **Get API key**
+4. **Add to .env**:
+   ```env
+   PEXELS_API_KEY=your_api_key_here
+   ```
+
+### Option 3: Both (Best results)
+```env
+UNSPLASH_ACCESS_KEY=your_unsplash_key
+PEXELS_API_KEY=your_pexels_key
 ```
+
+**See `FREE_IMAGE_APIS_SETUP.md` for detailed setup instructions**
+
+## Admin Interface Usage
+
+### Adding New Menu Items
+1. **Enter dish name** (e.g., "Chicken Tikka Masala")
+2. **Click "Auto-fetch" button** next to Image URL field
+3. **Image automatically appears** with preview
+4. **Save the menu item**
+
+### Updating Existing Items
+1. **Click the blue image icon** on any menu item card
+2. **System fetches new image** automatically
+3. **Image updates instantly**
+
+### Bulk Updates
+1. **Click "Bulk Update Images"** button in admin menu
+2. **Updates all items** without images
+3. **Shows progress** and results summary
+
+## How It Works
+
+### 1. Image Source Priority
+```
+1. Google Images API (if configured) - High quality, relevant
+2. Foodish API (free) - Good quality, limited categories  
+3. Lorem Picsum (fallback) - Consistent placeholders
+```
+
+### 2. Smart Search Enhancement
+The system enhances dish names for better Google results:
+- **"Biryani"** → **"Biryani food dish restaurant"**
+- **"Pizza Margherita"** → **"Pizza Margherita food dish restaurant"**
+- **"Chocolate Cake"** → **"Chocolate Cake food dish restaurant"**
+
+### 3. Automatic Integration
+- **New items**: Images fetched automatically when created
+- **Existing items**: Manual or bulk update available
+- **Caching**: Results cached to avoid duplicate API calls
 
 ## Advanced Usage
 

@@ -402,6 +402,29 @@ router.post('/:tenantId/menu/items/:itemId/auto-image', authenticateToken, autho
   }
 });
 
+// Auto-fetch image for dish name (for new items)
+router.post('/auto-fetch-image', authenticateToken, async (req, res) => {
+  try {
+    const { dishName } = req.body;
+
+    if (!dishName) {
+      return errorResponse(res, 400, 'Dish name is required');
+    }
+
+    const imageService = require('../utils/imageService');
+    const imageUrl = await imageService.autoFetchImageForMenuItem(dishName);
+    
+    if (imageUrl) {
+      successResponse(res, 200, { imageUrl }, 'Image found successfully');
+    } else {
+      errorResponse(res, 404, 'No image found for this dish');
+    }
+  } catch (error) {
+    console.error('Auto-fetch image error:', error);
+    errorResponse(res, 500, 'Internal server error', error.message);
+  }
+});
+
 // Bulk update images for all items without images
 router.post('/:tenantId/menu/items/bulk-auto-images', authenticateToken, authorizeRestaurantAdmin, verifyTenantAccess, async (req, res) => {
   try {
