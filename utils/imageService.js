@@ -3,105 +3,10 @@ const axios = require('axios');
 class ImageService {
   constructor() {
     this.imageCache = new Map();
-    this.googleApiKey = process.env.GOOGLE_API_KEY;
-    this.googleSearchEngineId = process.env.GOOGLE_SEARCH_ENGINE_ID;
   }
 
   /**
-   * Get food image from Unsplash API (free tier: 50 requests/hour)
-   */
-  async getUnsplashImage(dishName) {
-    try {
-      const unsplashAccessKey = process.env.UNSPLASH_ACCESS_KEY;
-      if (!unsplashAccessKey) {
-        console.log('⚠️ Unsplash API key not configured, skipping Unsplash search');
-        return null;
-      }
-
-      const searchQuery = `${dishName} food dish`;
-      console.log(`🔍 Searching Unsplash for: ${searchQuery}`);
-      
-      const response = await axios.get('https://api.unsplash.com/search/photos', {
-        params: {
-          query: searchQuery,
-          per_page: 3,
-          orientation: 'landscape',
-          content_filter: 'high'
-        },
-        headers: {
-          'Authorization': `Client-ID ${unsplashAccessKey}`
-        },
-        timeout: 8000
-      });
-
-      if (response.data && response.data.results && response.data.results.length > 0) {
-        const photo = response.data.results[0];
-        const imageUrl = photo.urls.regular; // High quality but not too large
-        
-        console.log(`✅ Found Unsplash image for ${dishName}: ${imageUrl}`);
-        return {
-          url: imageUrl,
-          source: 'Unsplash',
-          photographer: photo.user.name,
-          description: photo.description || photo.alt_description
-        };
-      }
-      
-      return null;
-    } catch (error) {
-      console.error(`❌ Error getting Unsplash image for ${dishName}:`, error.message);
-      return null;
-    }
-  }
-
-  /**
-   * Get food image from Pexels API (free tier: 200 requests/hour)
-   */
-  async getPexelsImage(dishName) {
-    try {
-      const pexelsApiKey = process.env.PEXELS_API_KEY;
-      if (!pexelsApiKey) {
-        console.log('⚠️ Pexels API key not configured, skipping Pexels search');
-        return null;
-      }
-
-      const searchQuery = `${dishName} food dish`;
-      console.log(`🔍 Searching Pexels for: ${searchQuery}`);
-      
-      const response = await axios.get('https://api.pexels.com/v1/search', {
-        params: {
-          query: searchQuery,
-          per_page: 3,
-          orientation: 'landscape'
-        },
-        headers: {
-          'Authorization': pexelsApiKey
-        },
-        timeout: 8000
-      });
-
-      if (response.data && response.data.photos && response.data.photos.length > 0) {
-        const photo = response.data.photos[0];
-        const imageUrl = photo.src.large; // High quality
-        
-        console.log(`✅ Found Pexels image for ${dishName}: ${imageUrl}`);
-        return {
-          url: imageUrl,
-          source: 'Pexels',
-          photographer: photo.photographer,
-          description: photo.alt
-        };
-      }
-      
-      return null;
-    } catch (error) {
-      console.error(`❌ Error getting Pexels image for ${dishName}:`, error.message);
-      return null;
-    }
-  }
-
-  /**
-   * Get food image from Foodish API (free, no API key)
+   * Get food image from Foodish API (free, no API key required)
    */
   async getFoodImage(dishName) {
     try {
@@ -123,7 +28,7 @@ class ImageService {
       
       console.log(`🔍 Fetching ${category} image for: ${dishName}`);
       
-      const response = await axios.get(`https://foodish-api.herokuapp.com/api/images/${category}`, {
+      const response = await axios.get(`https://foodish-api.com/api/images/${category}`, {
         timeout: 5000 // 5 second timeout
       });
       
@@ -166,42 +71,20 @@ class ImageService {
       return this.imageCache.get(dishName);
     }
 
-    let imageData = null;
-
-    // Try Unsplash first (free, high quality)
-    imageData = await this.getUnsplashImage(dishName);
-
-    // If Unsplash fails, try Pexels (free, good quality)
-    if (!imageData) {
-      imageData = await this.getPexelsImage(dishName);
-    }
-
-    // If both fail, try Foodish API (free, limited categories)
-    if (!imageData) {
-      const foodishResult = await this.getFoodImage(dishName);
-      if (foodishResult) {
-        imageData = {
-          url: foodishResult,
-          source: 'Foodish API'
-        };
-      }
-    }
+    // Try Foodish API first
+    let imageUrl = await this.getFoodImage(dishName);
     
-    // If all fail, use fallback
-    if (!imageData) {
-      const fallbackUrl = this.getFallbackImage(dishName);
-      imageData = {
-        url: fallbackUrl,
-        source: 'Lorem Picsum Fallback'
-      };
+    // If Foodish fails, use fallback
+    if (!imageUrl) {
+      imageUrl = this.getFallbackImage(dishName);
     }
 
     // Cache the result
-    if (imageData) {
-      this.imageCache.set(dishName, imageData.url);
+    if (imageUrl) {
+      this.imageCache.set(dishName, imageUrl);
     }
 
-    return imageData?.url;
+    return imageUrl;
   }
 
   /**
@@ -216,6 +99,24 @@ class ImageService {
       // Return fallback even if there's an error
       return this.getFallbackImage(dishName);
     }
+  }
+
+  /**
+   * Clear the image cache
+   */
+  clearCache() {
+    this.imageCache.clear();
+    console.log('🗑️ Image cache cleared');
+  }
+
+  /**
+   * Get cache statistics
+   */
+  getCacheStats() {
+    return {
+      size: this.imageCache.size,
+      keys: Array.from(this.imageCache.keys())
+    };
   }
 }
 
