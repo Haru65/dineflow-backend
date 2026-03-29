@@ -25,7 +25,7 @@ async function testFoodishAPI() {
       console.log(`📝 Testing: ${dish.name}`);
       console.log(`   Expected category: ${dish.expectedCategory}`);
       
-      const response = await axios.get(`https://foodish-api.herokuapp.com/api/images/${dish.expectedCategory}`);
+      const response = await axios.get(`https://foodish-api.com/api/images/${dish.expectedCategory}`);
       
       if (response.data && response.data.image) {
         console.log(`   ✅ Success: ${response.data.image}`);
