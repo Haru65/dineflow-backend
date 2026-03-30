@@ -223,6 +223,12 @@ function rateLimit(windowMs = 60000, maxRequests = 100) {
  */
 function validateContentType(req, res, next) {
   if (req.method !== 'GET' && req.method !== 'DELETE') {
+    // Skip content-type validation for menu extraction routes (they use multipart/form-data)
+    if (req.path.includes('/menu/extract-from-image') || 
+        req.path.includes('/menu/extract-and-import')) {
+      return next();
+    }
+    
     const contentType = req.headers['content-type'];
     if (!contentType || !contentType.includes('application/json')) {
       return errorResponse(res, 400, 'Content-Type must be application/json');
