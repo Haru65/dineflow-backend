@@ -25,6 +25,7 @@
     "test-image-api": "node scripts/test-image-fetching.js",
     "test-google-images": "node test-google-images.js",
     "test-free-images": "node test-google-images.js",
+    "test-groq": "node test-groq-extraction.js",
     "test-db": "node test-db-connection.js",
     "setup-postgres": "node setup-postgres-local.js",
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -36,6 +37,7 @@
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "jsonwebtoken": "^9.0.2",
+    "multer": "^2.1.1",
     "nodemailer": "^6.9.7",
     "paytmchecksum": "^1.5.1",
     "pg": "^8.11.3",

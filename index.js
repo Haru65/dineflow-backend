@@ -35,6 +35,7 @@ const publicRoutes = require('./routes/public');
 const paytmRoutes = require('./routes/paytm');
 const webhookRoutes = require('./routes/webhooks');
 const featuresRoutes = require('./routes/features');
+const menuExtractionRoutes = require('./routes/menuExtraction');
 
 // Health check
 app.get('/', (req, res) => {
@@ -46,6 +47,7 @@ app.use('/auth', authRoutes);
 app.use('/admin/superadmin', superadminRoutes);
 app.use('/admin/restaurant', restaurantRoutes);
 app.use('/admin/restaurant', featuresRoutes);
+app.use('/admin/restaurant', menuExtractionRoutes);
 app.use('/api/public', publicRoutes);
 app.use('/api/paytm', paytmRoutes);
 app.use('/api/webhooks', webhookRoutes);
