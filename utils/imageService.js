@@ -4,6 +4,8 @@ class ImageService {
   constructor() {
     this.imageCache = new Map();
     this.unsplashAccessKey = process.env.UNSPLASH_ACCESS_KEY;
+    this.unsplashSecretKey = process.env.UNSPLASH_SECRET_KEY;
+    this.unsplashAppName = process.env.UNSPLASH_APP_NAME || 'DineFlow';
     this.rateLimitWarningShown = false;
   }
 
@@ -13,7 +15,41 @@ class ImageService {
   isApiKeyConfigured() {
     return this.unsplashAccessKey &&
            this.unsplashAccessKey !== 'your_unsplash_access_key_here' &&
-           this.unsplashAccessKey !== '';
+           this.unsplashAccessKey.trim() !== '';
+  }
+
+  /**
+   * Get authorization headers
+   * Uses Access Key for standard requests (searching, fetching photos)
+   * Secret Key is reserved for OAuth operations (user authentication, uploads, etc.)
+   */
+  getAuthHeaders() {
+    return {
+      'Authorization': `Client-ID ${this.unsplashAccessKey}`,
+      'Accept-Version': 'v1',
+      'User-Agent': this.unsplashAppName
+    };
+  }
+
+  /**
+   * Trigger download endpoint (Unsplash API requirement)
+   * This is REQUIRED by Unsplash API guidelines to track photo usage
+   */
+  async triggerDownload(downloadLocation) {
+    try {
+      if (!downloadLocation) return;
+
+      // Trigger download without waiting for response (fire-and-forget)
+      axios.get(downloadLocation, {
+        headers: this.getAuthHeaders(),
+        timeout: 5000
+      }).catch(err => {
+        // Silent fail - don't block image return
+        console.warn('⚠️ Download tracking failed (non-critical):', err.message);
+      });
+    } catch (error) {
+      // Silent fail - this is non-critical
+    }
   }
 
   /**
@@ -38,29 +74,34 @@ class ImageService {
       // Map dish names to better search terms for Unsplash
       let searchQuery = 'food'; // default
 
-      if (dishLower.includes('biryani')) searchQuery = 'biryani food indian';
+      if (dishLower.includes('biryani')) searchQuery = 'biryani indian rice food';
       else if (dishLower.includes('burger')) searchQuery = 'burger food';
-      else if (dishLower.includes('chicken') || dishLower.includes('curry')) searchQuery = 'chicken curry food';
+      else if (dishLower.includes('chicken') || dishLower.includes('curry')) searchQuery = 'chicken curry indian food';
       else if (dishLower.includes('dessert') || dishLower.includes('sweet') || dishLower.includes('cake') || dishLower.includes('ice cream')) searchQuery = 'dessert food sweet';
       else if (dishLower.includes('dosa')) searchQuery = 'dosa south indian food';
       else if (dishLower.includes('idly') || dishLower.includes('idli')) searchQuery = 'idli south indian food';
       else if (dishLower.includes('pasta')) searchQuery = 'pasta food italian';
       else if (dishLower.includes('pizza')) searchQuery = 'pizza food';
-      else if (dishLower.includes('rice')) searchQuery = 'rice food';
-      else if (dishLower.includes('samosa')) searchQuery = 'samosa indian food';
+      else if (dishLower.includes('rice')) searchQuery = 'rice food dish';
+      else if (dishLower.includes('samosa')) searchQuery = 'samosa indian snack food';
+      else if (dishLower.includes('naan') || dishLower.includes('roti') || dishLower.includes('paratha')) searchQuery = 'naan bread indian';
+      else if (dishLower.includes('paneer')) searchQuery = 'paneer indian food';
+      else if (dishLower.includes('dal')) searchQuery = 'dal lentil indian food';
+      else if (dishLower.includes('tea') || dishLower.includes('chai')) searchQuery = 'indian tea chai beverage';
+      else if (dishLower.includes('coffee')) searchQuery = 'coffee beverage';
+      else if (dishLower.includes('juice')) searchQuery = `${dishName.split(' ')[0]} juice beverage`;
       else searchQuery = `${dishName} food`;
 
       console.log(`🔍 Searching Unsplash for: ${searchQuery}`);
 
       const response = await axios.get(`https://api.unsplash.com/search/photos`, {
         timeout: 10000, // 10 second timeout
-        headers: {
-          'Authorization': `Client-ID ${this.unsplashAccessKey}`
-        },
+        headers: this.getAuthHeaders(),
         params: {
           query: searchQuery,
           per_page: 10,
-          orientation: 'landscape'
+          orientation: 'landscape',
+          content_filter: 'high' // Filter out inappropriate content
         }
       });
 
@@ -74,7 +115,13 @@ class ImageService {
       if (response.data && response.data.results && response.data.results.length > 0) {
         // Get a random image from the first few results
         const randomIndex = Math.floor(Math.random() * Math.min(response.data.results.length, 5));
-        const imageUrl = response.data.results[randomIndex].urls.regular;
+        const photo = response.data.results[randomIndex];
+        const imageUrl = photo.urls.regular;
+
+        // IMPORTANT: Trigger download endpoint (Unsplash API requirement)
+        if (photo.links && photo.links.download_location) {
+          this.triggerDownload(photo.links.download_location);
+        }
 
         console.log(`✅ Found Unsplash image for ${dishName}: ${imageUrl}`);
         return imageUrl;
@@ -118,7 +165,7 @@ class ImageService {
       // Generate a consistent seed based on dish name for consistent images
       const seed = dishName.toLowerCase().replace(/[^a-z0-9]/g, '');
       const imageUrl = `https://picsum.photos/seed/${seed}/400/300`;
-      
+
       console.log(`🔄 Using fallback image for ${dishName}: ${imageUrl}`);
       return imageUrl;
     } catch (error) {
@@ -172,6 +219,7 @@ class ImageService {
    */
   clearCache() {
     this.imageCache.clear();
+    this.rateLimitWarningShown = false;
     console.log('🗑️ Image cache cleared');
   }
 
@@ -181,7 +229,21 @@ class ImageService {
   getCacheStats() {
     return {
       size: this.imageCache.size,
-      keys: Array.from(this.imageCache.keys())
+      keys: Array.from(this.imageCache.keys()),
+      configured: this.isApiKeyConfigured(),
+      appName: this.unsplashAppName
+    };
+  }
+
+  /**
+   * Get configuration status
+   */
+  getConfigStatus() {
+    return {
+      accessKeyConfigured: this.isApiKeyConfigured(),
+      secretKeyConfigured: Boolean(this.unsplashSecretKey && this.unsplashSecretKey !== 'your_unsplash_secret_key_here'),
+      appName: this.unsplashAppName,
+      cacheSize: this.imageCache.size
     };
   }
 }

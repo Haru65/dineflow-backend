@@ -1,6 +1,6 @@
 /**
  * menuExtraction.js
- * Routes for menu extraction using Groq Vision API
+ * Routes for menu extraction using Gemini Vision API
  */
 
 const express = require('express');
@@ -44,7 +44,7 @@ const verifyTenantAccess = async (req, res, next) => {
 
 /**
  * POST /:tenantId/menu/extract-from-image
- * Extract menu items from uploaded image using Groq Vision API
+ * Extract menu items from uploaded image using Gemini Vision API
  */
 router.post(
   '/:tenantId/menu/extract-from-image',
