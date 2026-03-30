@@ -8,7 +8,7 @@ const router = express.Router();
 const multer = require('multer');
 const { authenticateToken, authorizeRestaurantAdmin } = require('../utils/auth');
 const { errorResponse, successResponse } = require('../utils/helpers');
-const groqMenuExtractor = require('../services/groqMenuExtractor');
+const openaiMenuExtractor = require('../services/openaiMenuExtractor');
 const MenuCategoryRepository = require('../repositories/MenuCategoryRepository');
 const MenuItemRepository = require('../repositories/MenuItemRepository');
 
@@ -60,15 +60,15 @@ router.post(
 
       console.log(`Extracting menu from image: ${req.file.originalname} (${req.file.size} bytes)`);
 
-      // Extract menu items using Groq
-      const result = await groqMenuExtractor.extractMenuFromImage(
+      // Extract menu items using OpenAI
+      const result = await openaiMenuExtractor.extractMenuFromImage(
         req.file.buffer,
         req.file.mimetype
       );
 
       // Group items by category
-      const itemsByCategory = groqMenuExtractor.groupByCategory(result.items);
-      const stats = groqMenuExtractor.getStats(result.items);
+      const itemsByCategory = openaiMenuExtractor.groupByCategory(result.items);
+      const stats = openaiMenuExtractor.getStats(result.items);
 
       successResponse(res, 200, {
         success: true,
@@ -211,8 +211,8 @@ router.post(
 
       console.log(`Extracting and importing menu from: ${req.file.originalname}`);
 
-      // Step 1: Extract menu items using Groq
-      const extractionResult = await groqMenuExtractor.extractMenuFromImage(
+      // Step 1: Extract menu items using OpenAI
+      const extractionResult = await openaiMenuExtractor.extractMenuFromImage(
         req.file.buffer,
         req.file.mimetype
       );
@@ -279,8 +279,8 @@ router.post(
         imported: createdItems.length,
         failed: errors.length,
         items: createdItems,
-        itemsByCategory: groqMenuExtractor.groupByCategory(createdItems),
-        stats: groqMenuExtractor.getStats(createdItems),
+        itemsByCategory: openaiMenuExtractor.groupByCategory(createdItems),
+        stats: openaiMenuExtractor.getStats(createdItems),
         errors: errors.length > 0 ? errors : undefined,
         model: extractionResult.model
       }, `Extracted ${extractionResult.totalItems} items and imported ${createdItems.length} to database`);

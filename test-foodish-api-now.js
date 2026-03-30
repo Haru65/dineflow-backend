@@ -1,50 +1,67 @@
-const axios = require('axios');
+const imageService = require('./utils/imageService');
+require('dotenv').config();
 
 /**
- * Quick test to verify Foodish API is working
+ * Quick test to verify Unsplash API is working
  */
 
-async function testFoodishAPI() {
-  console.log('🧪 Testing Foodish API...\n');
+async function testUnsplashAPI() {
+  console.log('🧪 Testing Unsplash API via Image Service...\n');
 
-  const testCategories = [
+  // Check if API key is configured
+  if (!process.env.UNSPLASH_ACCESS_KEY || process.env.UNSPLASH_ACCESS_KEY === 'your_unsplash_access_key_here') {
+    console.log('❌ UNSPLASH_ACCESS_KEY not configured in .env file');
+    console.log('Please set your Unsplash Access Key in .env file');
+    return;
+  }
+
+  const testDishes = [
     'biryani',
     'burger',
-    'butter-chicken',
+    'chicken curry',
     'dessert',
     'dosa',
-    'idly',
+    'idli',
     'pasta',
     'pizza',
     'rice',
     'samosa'
   ];
 
-  for (const category of testCategories) {
+  for (const dishName of testDishes) {
     try {
-      console.log(`📝 Testing category: ${category}`);
-      
-      const response = await axios.get(`https://foodish-api.com/api/images/${category}`, {
-        timeout: 5000
-      });
-      
-      if (response.data && response.data.image) {
-        console.log(`   ✅ Success: ${response.data.image}`);
+      console.log(`📝 Testing dish: ${dishName}`);
+
+      const imageUrl = await imageService.getFoodImage(dishName);
+
+      if (imageUrl) {
+        console.log(`   ✅ Success: ${imageUrl}`);
       } else {
         console.log(`   ❌ No image returned`);
       }
-      
+
     } catch (error) {
       console.log(`   ❌ Error: ${error.message}`);
-      if (error.response) {
-        console.log(`   Status: ${error.response.status}`);
-        console.log(`   Data:`, error.response.data);
-      }
     }
-    
-    // Small delay
-    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Small delay to respect rate limits
+    await new Promise(resolve => setTimeout(resolve, 1200)); // Unsplash has 50 requests/hour limit
   }
+
+  // Test cache functionality
+  console.log('\n🔍 Testing cache functionality...');
+  const testDish = 'pizza';
+
+  console.time('First request (no cache)');
+  await imageService.getImageForDish(testDish);
+  console.timeEnd('First request (no cache)');
+
+  console.time('Second request (cached)');
+  await imageService.getImageForDish(testDish);
+  console.timeEnd('Second request (cached)');
+
+  // Show cache stats
+  console.log('\n📊 Cache stats:', imageService.getCacheStats());
 }
 
-testFoodishAPI().catch(console.error);
+testUnsplashAPI().catch(console.error);

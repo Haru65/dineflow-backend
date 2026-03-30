@@ -3,43 +3,62 @@ const axios = require('axios');
 class ImageService {
   constructor() {
     this.imageCache = new Map();
+    this.unsplashAccessKey = process.env.UNSPLASH_ACCESS_KEY;
   }
 
   /**
-   * Get food image from Foodish API (free, no API key required)
+   * Get food image from Unsplash API
    */
   async getFoodImage(dishName) {
     try {
-      const dishLower = dishName.toLowerCase();
-      
-      // Map dish names to Foodish categories
-      let category = 'biryani'; // default
-      
-      if (dishLower.includes('biryani')) category = 'biryani';
-      else if (dishLower.includes('burger')) category = 'burger';
-      else if (dishLower.includes('chicken') || dishLower.includes('curry')) category = 'butter-chicken';
-      else if (dishLower.includes('dessert') || dishLower.includes('sweet') || dishLower.includes('cake') || dishLower.includes('ice cream')) category = 'dessert';
-      else if (dishLower.includes('dosa')) category = 'dosa';
-      else if (dishLower.includes('idly') || dishLower.includes('idli')) category = 'idly';
-      else if (dishLower.includes('pasta')) category = 'pasta';
-      else if (dishLower.includes('pizza')) category = 'pizza';
-      else if (dishLower.includes('rice')) category = 'rice';
-      else if (dishLower.includes('samosa')) category = 'samosa';
-      
-      console.log(`🔍 Fetching ${category} image for: ${dishName}`);
-      
-      const response = await axios.get(`https://foodish-api.com/api/images/${category}`, {
-        timeout: 5000 // 5 second timeout
-      });
-      
-      if (response.data && response.data.image) {
-        console.log(`✅ Found image for ${dishName}: ${response.data.image}`);
-        return response.data.image;
+      if (!this.unsplashAccessKey) {
+        console.error('❌ UNSPLASH_ACCESS_KEY not configured');
+        return null;
       }
-      
+
+      const dishLower = dishName.toLowerCase();
+
+      // Map dish names to better search terms for Unsplash
+      let searchQuery = 'food'; // default
+
+      if (dishLower.includes('biryani')) searchQuery = 'biryani food indian';
+      else if (dishLower.includes('burger')) searchQuery = 'burger food';
+      else if (dishLower.includes('chicken') || dishLower.includes('curry')) searchQuery = 'chicken curry food';
+      else if (dishLower.includes('dessert') || dishLower.includes('sweet') || dishLower.includes('cake') || dishLower.includes('ice cream')) searchQuery = 'dessert food sweet';
+      else if (dishLower.includes('dosa')) searchQuery = 'dosa south indian food';
+      else if (dishLower.includes('idly') || dishLower.includes('idli')) searchQuery = 'idli south indian food';
+      else if (dishLower.includes('pasta')) searchQuery = 'pasta food italian';
+      else if (dishLower.includes('pizza')) searchQuery = 'pizza food';
+      else if (dishLower.includes('rice')) searchQuery = 'rice food';
+      else if (dishLower.includes('samosa')) searchQuery = 'samosa indian food';
+      else searchQuery = `${dishName} food`;
+
+      console.log(`🔍 Searching Unsplash for: ${searchQuery}`);
+
+      const response = await axios.get(`https://api.unsplash.com/search/photos`, {
+        timeout: 10000, // 10 second timeout
+        headers: {
+          'Authorization': `Client-ID ${this.unsplashAccessKey}`
+        },
+        params: {
+          query: searchQuery,
+          per_page: 10,
+          orientation: 'landscape'
+        }
+      });
+
+      if (response.data && response.data.results && response.data.results.length > 0) {
+        // Get a random image from the first few results
+        const randomIndex = Math.floor(Math.random() * Math.min(response.data.results.length, 5));
+        const imageUrl = response.data.results[randomIndex].urls.regular;
+
+        console.log(`✅ Found Unsplash image for ${dishName}: ${imageUrl}`);
+        return imageUrl;
+      }
+
       return null;
     } catch (error) {
-      console.error(`❌ Error getting image for ${dishName}:`, error.message);
+      console.error(`❌ Error getting Unsplash image for ${dishName}:`, error.message);
       return null;
     }
   }
@@ -71,10 +90,10 @@ class ImageService {
       return this.imageCache.get(dishName);
     }
 
-    // Try Foodish API first
+    // Try Unsplash API first
     let imageUrl = await this.getFoodImage(dishName);
-    
-    // If Foodish fails, use fallback
+
+    // If Unsplash fails, use fallback
     if (!imageUrl) {
       imageUrl = this.getFallbackImage(dishName);
     }
