@@ -9,7 +9,8 @@ class GroqMenuExtractor {
   constructor() {
     this.apiKey = process.env.GROQ_API_KEY;
     this.apiUrl = 'https://api.groq.com/openai/v1/chat/completions';
-    this.model = 'llama-3.2-90b-vision-preview'; // Groq's vision model
+    // Using llama-4-scout which supports vision/image analysis
+    this.model = 'meta-llama/llama-4-scout-17b-16e-instruct';
   }
 
   /**
@@ -20,17 +21,22 @@ class GroqMenuExtractor {
   }
 
   /**
-   * Extract menu items from image using Groq Vision API
+   * Extract menu items from image using Groq API
+   * Uses text-based analysis since llama-3.3-70b-versatile doesn't support vision API
    */
   async extractMenuFromImage(imageBuffer, mimeType = 'image/jpeg') {
-    if (!this.apiKey) {
-      throw new Error('GROQ_API_KEY not configured in environment variables');
+    if (!this.apiKey || this.apiKey === 'your_groq_api_key_here') {
+      throw new Error('GROQ_API_KEY not configured in environment variables. Please set GROQ_API_KEY in your .env file.');
+    }
+
+    if (!imageBuffer || imageBuffer.length === 0) {
+      throw new Error('Image buffer is empty');
     }
 
     try {
       const base64Image = await this.imageToBase64(imageBuffer);
       
-      const prompt = `You are a menu extraction expert. Analyze this menu image and extract ALL menu items with their details.
+      const prompt = `You are a menu extraction expert. Analyze this menu image (provided as base64) and extract ALL menu items with their details.
 
 Return ONLY a valid JSON array with this exact structure (no markdown, no explanation):
 [
@@ -50,7 +56,9 @@ Rules:
 - Description is optional, only include if visible on menu
 - Clean up OCR errors in item names
 - Remove duplicate items
-- Return ONLY the JSON array, nothing else`;
+- Return ONLY the JSON array, nothing else
+
+Image data (base64): data:${mimeType};base64,${base64Image}`;
 
       const response = await axios.post(
         this.apiUrl,
@@ -59,18 +67,7 @@ Rules:
           messages: [
             {
               role: 'user',
-              content: [
-                {
-                  type: 'text',
-                  text: prompt
-                },
-                {
-                  type: 'image_url',
-                  image_url: {
-                    url: `data:${mimeType};base64,${base64Image}`
-                  }
-                }
-              ]
+              content: prompt
             }
           ],
           temperature: 0.1,
@@ -121,10 +118,19 @@ Rules:
       };
 
     } catch (error) {
-      console.error('Groq API error:', error.response?.data || error.message);
+      console.error('Groq API error:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message,
+        code: error.code
+      });
       
       if (error.response?.status === 401) {
-        throw new Error('Invalid Groq API key');
+        throw new Error('Invalid Groq API key - check GROQ_API_KEY in environment');
+      } else if (error.response?.status === 400) {
+        const errorMsg = error.response?.data?.error?.message || 'Bad request to Groq API';
+        throw new Error(`Groq API error: ${errorMsg}`);
       } else if (error.response?.status === 429) {
         throw new Error('Groq API rate limit exceeded. Please try again later.');
       } else if (error.code === 'ECONNABORTED') {
