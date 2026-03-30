@@ -4,6 +4,16 @@ class ImageService {
   constructor() {
     this.imageCache = new Map();
     this.unsplashAccessKey = process.env.UNSPLASH_ACCESS_KEY;
+    this.rateLimitWarningShown = false;
+  }
+
+  /**
+   * Check if API key is properly configured
+   */
+  isApiKeyConfigured() {
+    return this.unsplashAccessKey &&
+           this.unsplashAccessKey !== 'your_unsplash_access_key_here' &&
+           this.unsplashAccessKey !== '';
   }
 
   /**
@@ -12,7 +22,14 @@ class ImageService {
   async getFoodImage(dishName) {
     try {
       if (!this.unsplashAccessKey) {
-        console.error('❌ UNSPLASH_ACCESS_KEY not configured');
+        console.error('❌ UNSPLASH_ACCESS_KEY not configured in .env file');
+        console.error('   Please set your Unsplash API key to enable image fetching');
+        return null;
+      }
+
+      if (!this.isApiKeyConfigured()) {
+        console.error('❌ UNSPLASH_ACCESS_KEY is still set to placeholder value');
+        console.error('   Please update it with your real Unsplash API key from https://unsplash.com/developers');
         return null;
       }
 
@@ -47,6 +64,13 @@ class ImageService {
         }
       });
 
+      // Check rate limit headers
+      const remaining = response.headers['x-ratelimit-remaining'];
+      if (remaining && parseInt(remaining) < 10 && !this.rateLimitWarningShown) {
+        console.warn(`⚠️ Unsplash API rate limit warning: ${remaining} requests remaining`);
+        this.rateLimitWarningShown = true;
+      }
+
       if (response.data && response.data.results && response.data.results.length > 0) {
         // Get a random image from the first few results
         const randomIndex = Math.floor(Math.random() * Math.min(response.data.results.length, 5));
@@ -56,9 +80,32 @@ class ImageService {
         return imageUrl;
       }
 
+      console.log(`⚠️ No images found for ${dishName} on Unsplash`);
       return null;
     } catch (error) {
-      console.error(`❌ Error getting Unsplash image for ${dishName}:`, error.message);
+      // Enhanced error handling
+      if (error.response) {
+        const status = error.response.status;
+
+        if (status === 401) {
+          console.error(`❌ Unsplash API Authentication Error (401)`);
+          console.error('   Your API key is invalid or expired');
+          console.error('   Please check your UNSPLASH_ACCESS_KEY in .env file');
+        } else if (status === 403) {
+          console.error(`❌ Unsplash API Access Forbidden (403)`);
+          console.error('   Your API key may not have the required permissions');
+        } else if (status === 429) {
+          console.error(`❌ Unsplash API Rate Limit Exceeded (429)`);
+          console.error('   You have exceeded the 50 requests/hour limit for free tier');
+          console.error('   Consider waiting or upgrading to paid plan (5000 requests/hour)');
+        } else {
+          console.error(`❌ Unsplash API Error (${status}): ${error.message}`);
+        }
+      } else if (error.code === 'ECONNABORTED') {
+        console.error(`❌ Unsplash API Timeout for ${dishName}`);
+      } else {
+        console.error(`❌ Network error getting Unsplash image for ${dishName}:`, error.message);
+      }
       return null;
     }
   }

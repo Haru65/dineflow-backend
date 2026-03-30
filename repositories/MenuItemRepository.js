@@ -141,29 +141,57 @@ class MenuItemRepository {
     try {
       let query = 'SELECT id, name FROM menu_items WHERE is_available = 1 AND (image_url IS NULL OR image_url = \'\')';
       let params = [];
-      
+
       if (tenantId) {
         query += ' AND tenant_id = $1';
         params = [tenantId];
       }
 
       const itemsWithoutImages = await dbAll(query, params);
-      
+
       console.log(`Found ${itemsWithoutImages.length} items without images`);
-      
+
+      // Calculate delay based on rate limits (50 requests/hour = 1 request per 72 seconds)
+      // Using 1.5 seconds delay for free tier (more conservative)
+      const DELAY_MS = 1500;
+
       const results = [];
-      for (const item of itemsWithoutImages) {
+      for (let i = 0; i < itemsWithoutImages.length; i++) {
+        const item = itemsWithoutImages[i];
         try {
+          console.log(`Processing ${i + 1}/${itemsWithoutImages.length}: ${item.name}`);
+
           const imageUrl = await this.autoUpdateImage(item.id);
-          results.push({ id: item.id, name: item.name, imageUrl, success: true });
-          
-          // Small delay to be respectful to APIs
-          await new Promise(resolve => setTimeout(resolve, 500));
+
+          if (imageUrl) {
+            results.push({ id: item.id, name: item.name, imageUrl, success: true });
+          } else {
+            results.push({ id: item.id, name: item.name, error: 'No image found', success: false });
+          }
+
+          // Add delay between requests to respect rate limits (except for last item)
+          if (i < itemsWithoutImages.length - 1) {
+            console.log(`⏳ Waiting ${DELAY_MS}ms before next request...`);
+            await new Promise(resolve => setTimeout(resolve, DELAY_MS));
+          }
         } catch (error) {
           console.error(`Failed to update image for ${item.name}:`, error.message);
           results.push({ id: item.id, name: item.name, error: error.message, success: false });
+
+          // Still add delay even for errors to avoid hammering the API
+          if (i < itemsWithoutImages.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, DELAY_MS));
+          }
         }
       }
+
+      const successful = results.filter(r => r.success).length;
+      const failed = results.filter(r => !r.success).length;
+
+      console.log(`\n📊 Bulk update summary:`);
+      console.log(`   Total: ${results.length}`);
+      console.log(`   ✅ Successful: ${successful}`);
+      console.log(`   ❌ Failed: ${failed}`);
 
       return results;
     } catch (error) {
