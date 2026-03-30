@@ -74,8 +74,7 @@ Rules:
             }
           ],
           temperature: 0.1,
-          max_tokens: 4096,
-          response_format: { type: 'json_object' }
+          max_tokens: 4096
         },
         {
           headers: {
@@ -94,7 +93,15 @@ Rules:
       // Parse the JSON response
       let menuItems;
       try {
-        const parsed = JSON.parse(content);
+        // Groq may return JSON wrapped in markdown code blocks, clean it
+        let cleanContent = content.trim();
+        if (cleanContent.startsWith('```json')) {
+          cleanContent = cleanContent.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+        } else if (cleanContent.startsWith('```')) {
+          cleanContent = cleanContent.replace(/```\n?/g, '');
+        }
+        
+        const parsed = JSON.parse(cleanContent);
         // Handle both direct array and object with items property
         menuItems = Array.isArray(parsed) ? parsed : (parsed.items || parsed.menu_items || []);
       } catch (parseError) {
