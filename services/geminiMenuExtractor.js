@@ -8,7 +8,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 class GeminiMenuExtractor {
   constructor() {
     this.apiKey = process.env.GEMINI_API_KEY;
-    this.model = 'gemini-2.0-flash-exp'; // Latest Gemini 2.0 Flash model with vision
+    this.model = 'gemini-1.5-flash'; // Use stable Gemini 1.5 Flash model
     this.genAI = null;
     
     if (this.apiKey && this.apiKey !== 'your_gemini_api_key_here') {
