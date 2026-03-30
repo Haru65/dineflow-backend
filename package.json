@@ -26,11 +26,13 @@
     "test-google-images": "node test-google-images.js",
     "test-free-images": "node test-google-images.js",
     "test-groq": "node test-groq-extraction.js",
+    "test-gemini": "node test-gemini-vision.js",
     "test-db": "node test-db-connection.js",
     "setup-postgres": "node setup-postgres-local.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.21.0",
     "axios": "^1.13.2",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",

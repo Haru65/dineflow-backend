@@ -8,7 +8,7 @@ const router = express.Router();
 const multer = require('multer');
 const { authenticateToken, authorizeRestaurantAdmin } = require('../utils/auth');
 const { errorResponse, successResponse } = require('../utils/helpers');
-const openaiMenuExtractor = require('../services/openaiMenuExtractor');
+const geminiMenuExtractor = require('../services/geminiMenuExtractor');
 const MenuCategoryRepository = require('../repositories/MenuCategoryRepository');
 const MenuItemRepository = require('../repositories/MenuItemRepository');
 
@@ -60,15 +60,15 @@ router.post(
 
       console.log(`Extracting menu from image: ${req.file.originalname} (${req.file.size} bytes)`);
 
-      // Extract menu items using OpenAI
-      const result = await openaiMenuExtractor.extractMenuFromImage(
+      // Extract menu items using Gemini
+      const result = await geminiMenuExtractor.extractMenuFromImage(
         req.file.buffer,
         req.file.mimetype
       );
 
       // Group items by category
-      const itemsByCategory = openaiMenuExtractor.groupByCategory(result.items);
-      const stats = openaiMenuExtractor.getStats(result.items);
+      const itemsByCategory = geminiMenuExtractor.groupByCategory(result.items);
+      const stats = geminiMenuExtractor.getStats(result.items);
 
       successResponse(res, 200, {
         success: true,
@@ -211,8 +211,8 @@ router.post(
 
       console.log(`Extracting and importing menu from: ${req.file.originalname}`);
 
-      // Step 1: Extract menu items using OpenAI
-      const extractionResult = await openaiMenuExtractor.extractMenuFromImage(
+      // Step 1: Extract menu items using Gemini
+      const extractionResult = await geminiMenuExtractor.extractMenuFromImage(
         req.file.buffer,
         req.file.mimetype
       );
@@ -279,8 +279,8 @@ router.post(
         imported: createdItems.length,
         failed: errors.length,
         items: createdItems,
-        itemsByCategory: openaiMenuExtractor.groupByCategory(createdItems),
-        stats: openaiMenuExtractor.getStats(createdItems),
+        itemsByCategory: geminiMenuExtractor.groupByCategory(createdItems),
+        stats: geminiMenuExtractor.getStats(createdItems),
         errors: errors.length > 0 ? errors : undefined,
         model: extractionResult.model
       }, `Extracted ${extractionResult.totalItems} items and imported ${createdItems.length} to database`);
