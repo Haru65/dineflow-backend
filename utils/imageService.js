@@ -53,7 +53,178 @@ class ImageService {
   }
 
   /**
-   * Get food image from Unsplash API
+   * Get optimized search query for dish name
+   */
+  getSearchQuery(dishName) {
+    const dishLower = dishName.toLowerCase().trim();
+    
+    // Exact dish name mappings (FOCUS ON PREPARED FOOD/DRINKS ONLY)
+    const exactMappings = {
+      // Biryani varieties - emphasize prepared dish
+      'chicken biryani': 'chicken biryani dish served plate indian restaurant',
+      'mutton biryani': 'mutton biryani dish served plate indian restaurant',
+      'veg biryani': 'vegetable biryani dish served plate indian restaurant',
+      'egg biryani': 'egg biryani dish served plate indian restaurant',
+      'fish biryani': 'fish biryani dish served plate indian restaurant',
+      
+      // Chicken dishes - emphasize cooked/prepared dishes
+      'butter chicken': 'butter chicken curry dish served bowl indian restaurant',
+      'chicken tikka masala': 'chicken tikka masala curry dish served indian restaurant',
+      'chicken curry': 'chicken curry dish served bowl indian restaurant',
+      'chicken 65': 'chicken 65 fried dish served plate indian restaurant',
+      'tandoori chicken': 'tandoori chicken grilled dish served plate indian restaurant',
+      'chicken korma': 'chicken korma curry dish served bowl indian restaurant',
+      'chicken vindaloo': 'chicken vindaloo curry dish served bowl indian restaurant',
+      
+      // Paneer dishes - emphasize prepared cottage cheese dishes
+      'paneer butter masala': 'paneer butter masala curry dish served bowl indian restaurant',
+      'paneer tikka': 'paneer tikka grilled dish served plate indian restaurant',
+      'palak paneer': 'palak paneer curry dish served bowl indian restaurant',
+      'kadai paneer': 'kadai paneer curry dish served bowl indian restaurant',
+      'paneer makhani': 'paneer makhani curry dish served bowl indian restaurant',
+      
+      // Dal varieties - emphasize prepared lentil dishes
+      'dal tadka': 'dal tadka lentil curry dish served bowl indian restaurant',
+      'dal makhani': 'dal makhani lentil curry dish served bowl indian restaurant',
+      'dal fry': 'dal fry lentil curry dish served bowl indian restaurant',
+      'sambar': 'sambar lentil curry dish served bowl south indian restaurant',
+      
+      // Breads - emphasize baked/prepared breads
+      'butter naan': 'butter naan bread served plate indian restaurant',
+      'garlic naan': 'garlic naan bread served plate indian restaurant',
+      'cheese naan': 'cheese naan bread served plate indian restaurant',
+      'tandoori roti': 'tandoori roti bread served plate indian restaurant',
+      'chapati': 'chapati bread served plate indian restaurant',
+      'paratha': 'paratha bread served plate indian restaurant',
+      
+      // South Indian - emphasize prepared dishes
+      'masala dosa': 'masala dosa served plate south indian restaurant',
+      'plain dosa': 'plain dosa served plate south indian restaurant',
+      'idli': 'idli served plate south indian restaurant',
+      'vada': 'vada served plate south indian restaurant',
+      'uttapam': 'uttapam served plate south indian restaurant',
+      
+      // Beverages - emphasize prepared drinks in cups/glasses
+      'masala tea': 'masala chai tea served cup glass indian',
+      'filter coffee': 'filter coffee served cup glass south indian',
+      'lassi': 'lassi drink served glass indian',
+      'mango lassi': 'mango lassi drink served glass indian',
+      
+      // Desserts - emphasize prepared sweets
+      'gulab jamun': 'gulab jamun dessert served plate bowl indian',
+      'rasgulla': 'rasgulla dessert served plate bowl indian',
+      'kheer': 'kheer dessert served bowl indian',
+      'kulfi': 'kulfi ice cream served indian',
+      
+      // Snacks - emphasize prepared snacks
+      'samosa': 'samosa fried snack served plate indian',
+      'pakora': 'pakora fried snack served plate indian',
+      'chaat': 'chaat snack served plate indian',
+      
+      // International (keep simple)
+      'pizza': 'pizza served plate',
+      'burger': 'burger served plate',
+      'pasta': 'pasta served plate',
+      'sandwich': 'sandwich served plate',
+      'french fries': 'french fries served plate',
+    };
+    
+    // Check for exact matches first
+    if (exactMappings[dishLower]) {
+      return exactMappings[dishLower];
+    }
+    
+    // Pattern-based matching (FOCUS ON PREPARED FOOD ONLY)
+    if (dishLower.includes('biryani')) {
+      if (dishLower.includes('chicken')) return 'chicken biryani dish served plate indian restaurant';
+      if (dishLower.includes('mutton') || dishLower.includes('lamb')) return 'mutton biryani dish served plate indian restaurant';
+      if (dishLower.includes('veg') || dishLower.includes('vegetable')) return 'vegetable biryani dish served plate indian restaurant';
+      if (dishLower.includes('egg')) return 'egg biryani dish served plate indian restaurant';
+      return 'biryani dish served plate indian restaurant';
+    }
+    
+    if (dishLower.includes('chicken')) {
+      if (dishLower.includes('butter')) return 'butter chicken curry dish served bowl indian restaurant';
+      if (dishLower.includes('tikka')) return 'chicken tikka dish served plate indian restaurant';
+      if (dishLower.includes('curry')) return 'chicken curry dish served bowl indian restaurant';
+      if (dishLower.includes('65')) return 'chicken 65 fried dish served plate indian restaurant';
+      if (dishLower.includes('tandoori')) return 'tandoori chicken dish served plate indian restaurant';
+      return 'chicken dish served plate indian restaurant';
+    }
+    
+    if (dishLower.includes('paneer')) {
+      if (dishLower.includes('butter') || dishLower.includes('makhani')) return 'paneer butter masala curry dish served bowl indian restaurant';
+      if (dishLower.includes('tikka')) return 'paneer tikka dish served plate indian restaurant';
+      if (dishLower.includes('palak')) return 'palak paneer curry dish served bowl indian restaurant';
+      return 'paneer dish served bowl indian restaurant';
+    }
+    
+    if (dishLower.includes('dal')) {
+      if (dishLower.includes('makhani')) return 'dal makhani curry dish served bowl indian restaurant';
+      if (dishLower.includes('tadka')) return 'dal tadka curry dish served bowl indian restaurant';
+      return 'dal curry dish served bowl indian restaurant';
+    }
+    
+    if (dishLower.includes('naan') || dishLower.includes('roti') || dishLower.includes('paratha')) {
+      if (dishLower.includes('butter')) return 'butter naan bread served plate indian restaurant';
+      if (dishLower.includes('garlic')) return 'garlic naan bread served plate indian restaurant';
+      if (dishLower.includes('cheese')) return 'cheese naan bread served plate indian restaurant';
+      return 'naan bread served plate indian restaurant';
+    }
+    
+    if (dishLower.includes('dosa')) {
+      if (dishLower.includes('masala')) return 'masala dosa served plate south indian restaurant';
+      return 'dosa served plate south indian restaurant';
+    }
+    
+    if (dishLower.includes('tea') || dishLower.includes('chai')) {
+      if (dishLower.includes('masala')) return 'masala chai tea served cup glass indian';
+      return 'chai tea served cup glass indian';
+    }
+    
+    if (dishLower.includes('coffee')) {
+      if (dishLower.includes('filter')) return 'filter coffee served cup glass south indian';
+      return 'coffee served cup glass';
+    }
+    
+    if (dishLower.includes('juice')) {
+      const fruitName = dishName.split(' ')[0].toLowerCase();
+      return `${fruitName} juice drink served glass`;
+    }
+    
+    if (dishLower.includes('lassi')) {
+      if (dishLower.includes('mango')) return 'mango lassi drink served glass indian';
+      return 'lassi drink served glass indian';
+    }
+    
+    // Dessert patterns
+    if (dishLower.includes('ice cream') || dishLower.includes('kulfi')) {
+      return 'kulfi ice cream served bowl indian';
+    }
+    
+    if (dishLower.includes('sweet') || dishLower.includes('dessert') || 
+        dishLower.includes('gulab') || dishLower.includes('rasgulla') || 
+        dishLower.includes('kheer')) {
+      return 'indian dessert served bowl plate';
+    }
+    
+    // International dishes (keep simple)
+    if (dishLower.includes('pizza')) return 'pizza served plate';
+    if (dishLower.includes('burger')) return 'burger served plate';
+    if (dishLower.includes('pasta')) return 'pasta served plate';
+    if (dishLower.includes('sandwich')) return 'sandwich served plate';
+    
+    // Generic patterns - focus on prepared food
+    if (dishLower.includes('rice')) return 'rice dish served plate indian restaurant';
+    if (dishLower.includes('curry')) return 'curry dish served bowl indian restaurant';
+    if (dishLower.includes('fry') || dishLower.includes('fried')) return 'fried dish served plate indian restaurant';
+    
+    // Default: focus on prepared food
+    return `${dishName} dish served plate bowl indian restaurant`;
+  }
+
+  /**
+   * Get food image from Unsplash API with multiple search strategies
    */
   async getFoodImage(dishName) {
     try {
@@ -69,37 +240,51 @@ class ImageService {
         return null;
       }
 
-      const dishLower = dishName.toLowerCase();
+      // Try multiple ULTRA-INDIAN search strategies
+      const searchStrategies = [
+        this.getSearchQuery(dishName), // Primary ultra-Indian search
+        `traditional indian ${dishName} desi authentic homestyle`, // Fallback 1 - force Indian
+        `indian ${dishName} curry spice masala authentic`, // Fallback 2 - Indian with spices
+        `${dishName} india traditional authentic desi`, // Fallback 3 - India focus
+        `${dishName} indian food` // Final fallback
+      ];
 
-      // Map dish names to better search terms for Unsplash
-      let searchQuery = 'food'; // default
+      for (let i = 0; i < searchStrategies.length; i++) {
+        const searchQuery = searchStrategies[i];
+        console.log(`🔍 Searching Unsplash (attempt ${i + 1}): "${dishName}" → "${searchQuery}"`);
 
-      if (dishLower.includes('biryani')) searchQuery = 'biryani indian rice food';
-      else if (dishLower.includes('burger')) searchQuery = 'burger food';
-      else if (dishLower.includes('chicken') || dishLower.includes('curry')) searchQuery = 'chicken curry indian food';
-      else if (dishLower.includes('dessert') || dishLower.includes('sweet') || dishLower.includes('cake') || dishLower.includes('ice cream')) searchQuery = 'dessert food sweet';
-      else if (dishLower.includes('dosa')) searchQuery = 'dosa south indian food';
-      else if (dishLower.includes('idly') || dishLower.includes('idli')) searchQuery = 'idli south indian food';
-      else if (dishLower.includes('pasta')) searchQuery = 'pasta food italian';
-      else if (dishLower.includes('pizza')) searchQuery = 'pizza food';
-      else if (dishLower.includes('rice')) searchQuery = 'rice food dish';
-      else if (dishLower.includes('samosa')) searchQuery = 'samosa indian snack food';
-      else if (dishLower.includes('naan') || dishLower.includes('roti') || dishLower.includes('paratha')) searchQuery = 'naan bread indian';
-      else if (dishLower.includes('paneer')) searchQuery = 'paneer indian food';
-      else if (dishLower.includes('dal')) searchQuery = 'dal lentil indian food';
-      else if (dishLower.includes('tea') || dishLower.includes('chai')) searchQuery = 'indian tea chai beverage';
-      else if (dishLower.includes('coffee')) searchQuery = 'coffee beverage';
-      else if (dishLower.includes('juice')) searchQuery = `${dishName.split(' ')[0]} juice beverage`;
-      else searchQuery = `${dishName} food`;
+        const imageUrl = await this.searchUnsplashWithQuery(searchQuery, dishName, i === 0);
+        
+        if (imageUrl) {
+          return imageUrl;
+        }
+        
+        // If first attempt failed, try next strategy
+        if (i < searchStrategies.length - 1) {
+          console.log(`⚠️ No suitable images found, trying alternative search...`);
+          await new Promise(resolve => setTimeout(resolve, 500)); // Small delay between attempts
+        }
+      }
 
-      console.log(`🔍 Searching Unsplash for: ${searchQuery}`);
+      console.log(`⚠️ No images found for ${dishName} with any search strategy`);
+      return null;
+    } catch (error) {
+      console.error(`❌ Error in getFoodImage for ${dishName}:`, error.message);
+      return null;
+    }
+  }
 
+  /**
+   * Search Unsplash with a specific query
+   */
+  async searchUnsplashWithQuery(searchQuery, dishName, useEnhancedFiltering = true) {
+    try {
       const response = await axios.get(`https://api.unsplash.com/search/photos`, {
         timeout: 10000, // 10 second timeout
         headers: this.getAuthHeaders(),
         params: {
           query: searchQuery,
-          per_page: 10,
+          per_page: useEnhancedFiltering ? 30 : 15, // More results for enhanced filtering
           orientation: 'landscape',
           content_filter: 'high' // Filter out inappropriate content
         }
@@ -113,9 +298,63 @@ class ImageService {
       }
 
       if (response.data && response.data.results && response.data.results.length > 0) {
-        // Get a random image from the first few results
-        const randomIndex = Math.floor(Math.random() * Math.min(response.data.results.length, 5));
-        const photo = response.data.results[randomIndex];
+        let resultsToUse = response.data.results;
+
+        if (useEnhancedFiltering) {
+          // STRICT filtering for ONLY prepared food and drinks (not ingredients or cooking processes)
+          const preparedFoodResults = response.data.results.filter(photo => {
+            const description = (photo.description || '').toLowerCase();
+            const altDescription = (photo.alt_description || '').toLowerCase();
+            const tags = photo.tags ? photo.tags.map(tag => tag.title.toLowerCase()).join(' ') : '';
+            
+            const combinedText = `${description} ${altDescription} ${tags}`;
+            
+            // MUST have prepared food/drink keywords (not ingredients or processes)
+            const preparedFoodKeywords = ['dish', 'meal', 'plate', 'bowl', 'served', 'cooked', 'prepared', 'ready', 'restaurant', 'curry', 'rice', 'bread', 'drink', 'beverage', 'cup', 'glass', 'served'];
+            const hasPreparedFood = preparedFoodKeywords.some(keyword => combinedText.includes(keyword));
+            
+            // MUST have Indian context
+            const indianKeywords = ['indian', 'india', 'curry', 'masala', 'tandoori', 'biryani', 'naan', 'dal', 'paneer', 'tikka', 'dosa', 'chai', 'lassi'];
+            const hasIndian = indianKeywords.some(keyword => combinedText.includes(keyword));
+            
+            // EXCLUDE ingredients, raw materials, cooking processes, and non-food items
+            const excludeKeywords = ['grinding', 'powder', 'spice', 'ingredient', 'raw', 'uncooked', 'market', 'shop', 'selling', 'vendor', 'street vendor', 'cooking process', 'preparation', 'making', 'recipe step', 'mortar', 'pestle', 'grinder'];
+            const hasExcluded = excludeKeywords.some(keyword => combinedText.includes(keyword));
+            
+            // EXCLUDE non-Indian cuisines
+            const nonIndianKeywords = ['chinese', 'italian', 'mexican', 'japanese', 'thai', 'american', 'french', 'mediterranean', 'korean'];
+            const hasNonIndian = nonIndianKeywords.some(keyword => combinedText.includes(keyword));
+            
+            return hasPreparedFood && hasIndian && !hasExcluded && !hasNonIndian;
+          });
+          
+          // If we have prepared food results, use them
+          if (preparedFoodResults.length > 0) {
+            resultsToUse = preparedFoodResults;
+          } else {
+            // Fallback: Just prepared food (any cuisine) but exclude ingredients/processes
+            const generalPreparedResults = response.data.results.filter(photo => {
+              const description = (photo.description || '').toLowerCase();
+              const altDescription = (photo.alt_description || '').toLowerCase();
+              const tags = photo.tags ? photo.tags.map(tag => tag.title.toLowerCase()).join(' ') : '';
+              
+              const combinedText = `${description} ${altDescription} ${tags}`;
+              
+              const preparedFoodKeywords = ['dish', 'meal', 'plate', 'bowl', 'served', 'cooked', 'prepared', 'ready', 'restaurant', 'food', 'drink', 'beverage', 'cup', 'glass'];
+              const hasPreparedFood = preparedFoodKeywords.some(keyword => combinedText.includes(keyword));
+              
+              const excludeKeywords = ['grinding', 'powder', 'spice', 'ingredient', 'raw', 'uncooked', 'market', 'shop', 'selling', 'vendor', 'cooking process', 'preparation', 'making', 'recipe step', 'mortar', 'pestle', 'grinder'];
+              const hasExcluded = excludeKeywords.some(keyword => combinedText.includes(keyword));
+              
+              return hasPreparedFood && !hasExcluded;
+            });
+            
+            resultsToUse = generalPreparedResults.length > 0 ? generalPreparedResults : response.data.results.slice(0, 5);
+          }
+        }
+        
+        // Get the best result (most relevant)
+        const photo = resultsToUse[0];
         const imageUrl = photo.urls.regular;
 
         // IMPORTANT: Trigger download endpoint (Unsplash API requirement)
@@ -127,7 +366,6 @@ class ImageService {
         return imageUrl;
       }
 
-      console.log(`⚠️ No images found for ${dishName} on Unsplash`);
       return null;
     } catch (error) {
       // Enhanced error handling
@@ -245,6 +483,13 @@ class ImageService {
       appName: this.unsplashAppName,
       cacheSize: this.imageCache.size
     };
+  }
+
+  /**
+   * Public method to test search query generation
+   */
+  testSearchQuery(dishName) {
+    return this.getSearchQuery(dishName);
   }
 }
 
