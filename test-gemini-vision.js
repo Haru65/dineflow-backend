@@ -7,7 +7,7 @@ const geminiMenuExtractor = require('./services/geminiMenuExtractor');
 const fs = require('fs');
 
 async function testGeminiVision() {
-  console.log('🧪 Testing Google Gemini 2.0 Flash Vision API for Menu Extraction\n');
+  console.log('🧪 Testing Google Gemini 2.5 Flash Vision API for Menu Extraction\n');
   
   const apiKey = process.env.GEMINI_API_KEY;
   
