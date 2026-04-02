@@ -27,12 +27,12 @@ class MenuCategoryRepository {
 
   async updateById(id, updates) {
     const fields = Object.keys(updates)
-      .map(key => `${key} = $1`)
+      .map((key, index) => `"${key}" = $${index + 1}`)
       .join(', ');
     const values = Object.values(updates);
 
     await dbRun(
-      `UPDATE menu_categories SET ${fields}, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+      `UPDATE menu_categories SET ${fields}, updated_at = CURRENT_TIMESTAMP WHERE id = $${values.length + 1}`,
       [...values, id]
     );
   }

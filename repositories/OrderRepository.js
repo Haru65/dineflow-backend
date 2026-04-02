@@ -76,7 +76,7 @@ class OrderRepository {
 
   async updateById(id, updates) {
     const fields = Object.keys(updates)
-      .map((key, index) => `${key} = $${index + 1}`)
+      .map((key, index) => `"${key}" = $${index + 1}`)
       .join(', ');
     const values = Object.values(updates);
 

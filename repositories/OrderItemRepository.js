@@ -48,7 +48,7 @@ class OrderItemRepository {
 
     for (const [key, value] of Object.entries(updates)) {
       paramCount++;
-      fields.push(`${key} = $${paramCount}`);
+      fields.push(`"${key}" = $${paramCount}`);
       values.push(value);
     }
 

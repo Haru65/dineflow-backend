@@ -23,26 +23,30 @@ class EmailConfigRepository {
   async updateById(id, updates) {
     const fields = [];
     const values = [];
+    let paramCount = 0;
     
     if (updates.email_address) {
-      fields.push('email_address = $1');
+      paramCount++;
+      fields.push(`"email_address" = $${paramCount}`);
       values.push(updates.email_address);
     }
     if (updates.app_password) {
-      fields.push('app_password = $1');
+      paramCount++;
+      fields.push(`"app_password" = $${paramCount}`);
       values.push(updates.app_password);
     }
     if (updates.is_active !== undefined) {
-      fields.push('is_active = $1');
+      paramCount++;
+      fields.push(`"is_active" = $${paramCount}`);
       values.push(updates.is_active);
     }
 
     if (fields.length === 0) return;
 
-    fields.push('updated_at = CURRENT_TIMESTAMP');
+    paramCount++;
     values.push(id);
 
-    const sql = `UPDATE email_configs SET ${fields.join(', ')} WHERE id = $1`;
+    const sql = `UPDATE email_configs SET ${fields.join(', ')} WHERE id = $${paramCount}`;
     await dbRun(sql, values);
   }
 

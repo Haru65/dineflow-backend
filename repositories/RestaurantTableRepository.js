@@ -39,7 +39,7 @@ class RestaurantTableRepository {
   async updateById(id, updates) {
     const fields = Object.keys(updates);
     const placeholders = fields
-      .map((_, index) => `${fields[index]} = $${index + 1}`)
+      .map((_, index) => `"${fields[index]}" = $${index + 1}`)
       .join(', ');
     const values = Object.values(updates);
     const placeholderCount = values.length;
