@@ -34,13 +34,15 @@ class UserRepository {
   }
 
   async updateById(id, updates) {
-    const fields = Object.keys(updates)
-      .map(key => `${key} = $1`)
+    const fields = Object.keys(updates);
+    const placeholders = fields
+      .map((_, index) => `${fields[index]} = $${index + 1}`)
       .join(', ');
     const values = Object.values(updates);
+    const placeholderCount = values.length;
 
     await dbRun(
-      `UPDATE users SET ${fields}, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+      `UPDATE users SET ${placeholders}, updated_at = CURRENT_TIMESTAMP WHERE id = $${placeholderCount + 1}`,
       [...values, id]
     );
   }
