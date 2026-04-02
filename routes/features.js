@@ -308,33 +308,4 @@ router.delete('/:tenantId/quick-actions/:actionId', authenticateToken, authorize
   }
 });
 
-// ===================== MENU ITEM EDITING =====================
-
-// Update menu item (edit)
-router.put('/:tenantId/menu/items/:itemId', authenticateToken, authorizeRestaurantAdmin, verifyTenantAccess, async (req, res) => {
-  try {
-    const { itemId } = req.params;
-    const { name, description, price, is_available, image_url } = req.body;
-
-    const item = await MenuItemRepository.findById(itemId);
-    if (!item || item.tenant_id !== req.params.tenantId) {
-      return errorResponse(res, 404, 'Menu item not found');
-    }
-
-    await MenuItemRepository.updateById(itemId, {
-      name: name || item.name,
-      description: description !== undefined ? description : item.description,
-      price: price !== undefined ? price : item.price,
-      is_available: is_available !== undefined ? is_available : item.is_available,
-      image_url: image_url !== undefined ? image_url : item.image_url
-    });
-
-    const updated = await MenuItemRepository.findById(itemId);
-    successResponse(res, 200, updated, 'Menu item updated successfully');
-  } catch (error) {
-    console.error('Update menu item error:', error);
-    errorResponse(res, 500, 'Internal server error', error.message);
-  }
-});
-
 module.exports = router;
