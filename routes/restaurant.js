@@ -18,7 +18,6 @@ const MenuCategoryRepository = require('../repositories/MenuCategoryRepository')
 const MenuItemRepository = require('../repositories/MenuItemRepository');
 const OrderRepository = require('../repositories/OrderRepository');
 const OrderItemRepository = require('../repositories/OrderItemRepository');
-const PaymentProviderRepository = require('../repositories/PaymentProviderRepository');
 const IntegrationRepository = require('../repositories/IntegrationRepository');
 const EmailConfigRepository = require('../repositories/EmailConfigRepository');
 const ReportsRepository = require('../repositories/ReportsRepository');
@@ -88,6 +87,94 @@ router.post('/:tenantId/tables', authenticateToken, authorizeRestaurantAdmin, ve
     successResponse(res, 201, { id: tableId, qr_url: qrUrl }, 'Table created successfully');
   } catch (error) {
     console.error('Create table error:', error);
+    errorResponse(res, 500, 'Internal server error', error.message);
+  }
+});
+
+// Bulk create tables
+router.post('/:tenantId/tables/bulk', authenticateToken, authorizeRestaurantAdmin, verifyTenantAccess, async (req, res) => {
+  try {
+    const { tables } = req.body;
+
+    if (!Array.isArray(tables) || tables.length === 0) {
+      return errorResponse(res, 400, 'Tables array is required and must not be empty');
+    }
+
+    if (tables.length > 100) {
+      return errorResponse(res, 400, 'Maximum 100 tables can be created at once');
+    }
+
+    const tenant = await TenantRepository.findById(req.params.tenantId);
+    if (!tenant) {
+      return errorResponse(res, 404, 'Restaurant not found');
+    }
+
+    const createdTables = [];
+    const errors = [];
+
+    for (let i = 0; i < tables.length; i++) {
+      const { name, identifier, table_type = 'regular' } = tables[i];
+
+      // Validation
+      if (!name || !identifier) {
+        errors.push(`Table ${i + 1}: Name and identifier are required`);
+        continue;
+      }
+
+      // Sanitize identifier
+      const sanitizedIdentifier = sanitizeTableIdentifier(identifier);
+      
+      if (!sanitizedIdentifier) {
+        errors.push(`Table ${i + 1}: Invalid identifier format`);
+        continue;
+      }
+
+      // Check if identifier already exists
+      const existing = await RestaurantTableRepository.findByIdentifier(req.params.tenantId, sanitizedIdentifier);
+      if (existing) {
+        errors.push(`Table ${i + 1}: Identifier "${sanitizedIdentifier}" already exists`);
+        continue;
+      }
+
+      try {
+        const qrUrl = generateQRUrl(tenant.slug, sanitizedIdentifier);
+        const tableId = await RestaurantTableRepository.create({
+          tenant_id: req.params.tenantId,
+          name,
+          identifier: sanitizedIdentifier,
+          qr_url: qrUrl,
+          table_type
+        });
+
+        createdTables.push({
+          id: tableId,
+          name,
+          identifier: sanitizedIdentifier,
+          qr_url: qrUrl,
+          table_type,
+          is_active: 1
+        });
+      } catch (err) {
+        errors.push(`Table ${i + 1} (${name}): Failed to create - ${err.message}`);
+      }
+    }
+
+    // Return response with created tables and any errors
+    const response = {
+      created: createdTables.length,
+      total: tables.length,
+      tables: createdTables
+    };
+
+    if (errors.length > 0) {
+      response.errors = errors;
+      response.message = `Created ${createdTables.length} of ${tables.length} tables`;
+      successResponse(res, 207, response, response.message);
+    } else {
+      successResponse(res, 201, response, `All ${createdTables.length} tables created successfully`);
+    }
+  } catch (error) {
+    console.error('Bulk create tables error:', error);
     errorResponse(res, 500, 'Internal server error', error.message);
   }
 });
@@ -380,73 +467,6 @@ router.delete('/:tenantId/menu/items/:itemId', authenticateToken, authorizeResta
   }
 });
 
-// Auto-update image for menu item
-router.post('/:tenantId/menu/items/:itemId/auto-image', authenticateToken, authorizeRestaurantAdmin, verifyTenantAccess, async (req, res) => {
-  try {
-    const item = await MenuItemRepository.findById(req.params.itemId);
-
-    if (!item || item.tenant_id !== req.params.tenantId) {
-      return errorResponse(res, 404, 'Menu item not found');
-    }
-
-    const imageUrl = await MenuItemRepository.autoUpdateImage(req.params.itemId);
-    
-    if (imageUrl) {
-      successResponse(res, 200, { id: req.params.itemId, image_url: imageUrl }, 'Image updated successfully');
-    } else {
-      errorResponse(res, 404, 'No image found for this item');
-    }
-  } catch (error) {
-    console.error('Auto-update image error:', error);
-    errorResponse(res, 500, 'Internal server error', error.message);
-  }
-});
-
-// Auto-fetch image for dish name (for new items)
-router.post('/auto-fetch-image', authenticateToken, async (req, res) => {
-  try {
-    const { dishName } = req.body;
-
-    if (!dishName) {
-      return errorResponse(res, 400, 'Dish name is required');
-    }
-
-    const imageService = require('../utils/imageService');
-    const imageUrl = await imageService.autoFetchImageForMenuItem(dishName);
-    
-    if (imageUrl) {
-      successResponse(res, 200, { imageUrl }, 'Image found successfully');
-    } else {
-      errorResponse(res, 404, 'No image found for this dish');
-    }
-  } catch (error) {
-    console.error('Auto-fetch image error:', error);
-    errorResponse(res, 500, 'Internal server error', error.message);
-  }
-});
-
-// Bulk update images for all items without images
-router.post('/:tenantId/menu/items/bulk-auto-images', authenticateToken, authorizeRestaurantAdmin, verifyTenantAccess, async (req, res) => {
-  try {
-    const results = await MenuItemRepository.bulkUpdateMissingImages(req.params.tenantId);
-    
-    const successful = results.filter(r => r.success).length;
-    const failed = results.filter(r => !r.success).length;
-    
-    successResponse(res, 200, {
-      results,
-      summary: {
-        total: results.length,
-        successful,
-        failed
-      }
-    }, `Bulk image update completed: ${successful} successful, ${failed} failed`);
-  } catch (error) {
-    console.error('Bulk auto-update images error:', error);
-    errorResponse(res, 500, 'Internal server error', error.message);
-  }
-});
-
 // ===================== ORDERS =====================
 
 // Get all orders for restaurant
@@ -622,103 +642,6 @@ router.put('/:tenantId/orders/:orderId/items/:itemId', authenticateToken, author
     successResponse(res, 200, { ...updated, items }, 'Order item updated successfully');
   } catch (error) {
     console.error('Update order item error:', error);
-    errorResponse(res, 500, 'Internal server error', error.message);
-  }
-});
-
-// ===================== PAYMENT CONFIG =====================
-
-// Get payment provider config
-router.get('/:tenantId/payment-config', authenticateToken, authorizeRestaurantAdmin, verifyTenantAccess, async (req, res) => {
-  try {
-    const provider = req.query.provider || 'razorpay'; // Default to razorpay for backward compatibility
-    const config = await PaymentProviderRepository.findByTenant(req.params.tenantId, provider);
-    
-    if (config) {
-      // Don't expose the full secret, return masked version
-      const maskedSecret = config.key_secret 
-        ? config.key_secret.substring(0, 10) + '***'
-        : null;
-      
-      return successResponse(res, 200, {
-        id: config.id,
-        provider: config.provider,
-        key_id: config.key_id,
-        key_secret: maskedSecret,
-        webhook_secret: config.webhook_secret,
-        website: config.website || 'WEBSTAGING',
-        is_active: config.is_active,
-        created_at: config.created_at
-      });
-    }
-
-    successResponse(res, 200, null);
-  } catch (error) {
-    console.error('Get payment config error:', error);
-    errorResponse(res, 500, 'Internal server error', error.message);
-  }
-});
-
-// Create or update payment provider config
-router.post('/:tenantId/payment-config', authenticateToken, authorizeRestaurantAdmin, verifyTenantAccess, async (req, res) => {
-  try {
-    const { provider = 'razorpay', key_id, key_secret, webhook_secret, website } = req.body;
-
-    if (!key_id || !key_secret) {
-      return errorResponse(res, 400, 'Key ID and key secret are required');
-    }
-
-    if (!['razorpay', 'paytm'].includes(provider)) {
-      return errorResponse(res, 400, 'Invalid payment provider');
-    }
-
-    const existing = await PaymentProviderRepository.findByTenant(req.params.tenantId, provider);
-
-    if (existing) {
-      // Update
-      const updates = {
-        key_id,
-        key_secret,
-        webhook_secret: webhook_secret || existing.webhook_secret
-      };
-      
-      if (provider === 'paytm' && website) {
-        updates.website = website;
-      }
-
-      await PaymentProviderRepository.updateById(existing.id, updates);
-
-      const updated = await PaymentProviderRepository.findById(existing.id);
-      return successResponse(res, 200, {
-        id: updated.id,
-        provider: updated.provider,
-        key_id: updated.key_id,
-        is_active: updated.is_active
-      }, `${provider} config updated successfully`);
-    } else {
-      // Create
-      const configData = {
-        tenant_id: req.params.tenantId,
-        provider,
-        key_id,
-        key_secret,
-        webhook_secret
-      };
-      
-      if (provider === 'paytm' && website) {
-        configData.website = website;
-      }
-
-      const configId = await PaymentProviderRepository.create(configData);
-
-      successResponse(res, 201, {
-        id: configId,
-        provider,
-        key_id
-      }, `${provider} config created successfully`);
-    }
-  } catch (error) {
-    console.error('Create/update payment config error:', error);
     errorResponse(res, 500, 'Internal server error', error.message);
   }
 });

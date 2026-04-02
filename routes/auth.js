@@ -11,6 +11,63 @@ const {
 } = require('../utils/auth');
 const { validateEmail, errorResponse, successResponse } = require('../utils/helpers');
 
+// Rate limiting for login attempts
+const loginAttempts = new Map(); // Format: { email: { count: number, resetTime: timestamp } }
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOGIN_ATTEMPT_WINDOW = 15 * 60 * 1000; // 15 minutes
+
+// Check and update login rate limit
+const checkRateLimit = (email) => {
+  const now = Date.now();
+  const attempt = loginAttempts.get(email);
+
+  // No previous attempts or window expired
+  if (!attempt || now > attempt.resetTime) {
+    return { allowed: true, attempts: 0, timeRemaining: 0 };
+  }
+
+  // Still within rate limit window
+  if (attempt.count >= MAX_LOGIN_ATTEMPTS) {
+    const timeRemaining = attempt.resetTime - now;
+    return { allowed: false, attempts: attempt.count, timeRemaining };
+  }
+
+  return { allowed: true, attempts: attempt.count, timeRemaining: 0 };
+};
+
+// Record failed login attempt
+const recordFailedAttempt = (email) => {
+  const now = Date.now();
+  const attempt = loginAttempts.get(email);
+
+  if (!attempt || now > attempt.resetTime) {
+    // New attempt window
+    loginAttempts.set(email, {
+      count: 1,
+      resetTime: now + LOGIN_ATTEMPT_WINDOW
+    });
+  } else {
+    // Increment existing window
+    attempt.count++;
+    attempt.resetTime = now + LOGIN_ATTEMPT_WINDOW;
+  }
+};
+
+// Clear login attempts on successful login
+const clearLoginAttempts = (email) => {
+  loginAttempts.delete(email);
+};
+
+// Cleanup old entries periodically (every 30 minutes)
+setInterval(() => {
+  const now = Date.now();
+  for (const [email, attempt] of loginAttempts.entries()) {
+    if (now > attempt.resetTime) {
+      loginAttempts.delete(email);
+    }
+  }
+}, 30 * 60 * 1000);
+
 // Login
 router.post('/login', async (req, res) => {
   try {
@@ -24,12 +81,23 @@ router.post('/login', async (req, res) => {
       return errorResponse(res, 400, 'Invalid email format');
     }
 
+    // Check rate limit
+    const rateLimitStatus = checkRateLimit(email);
+    if (!rateLimitStatus.allowed) {
+      console.warn(`⚠️  Rate limit exceeded for ${email} - attempts: ${rateLimitStatus.attempts}/${MAX_LOGIN_ATTEMPTS}`);
+      return errorResponse(res, 429, `Too many login attempts. Please try again after ${Math.ceil(rateLimitStatus.timeRemaining / 1000 / 60)} minutes`, { retryAfter: rateLimitStatus.timeRemaining });
+    }
+
     // Hardcoded superadmin - doesn't require database
     const SUPERADMIN_EMAIL = process.env.SUPERADMIN_EMAIL || 'admin@dineflow.com';
     const SUPERADMIN_PASSWORD = process.env.SUPERADMIN_PASSWORD || 'admin123';
     
     if (email === SUPERADMIN_EMAIL && password === SUPERADMIN_PASSWORD) {
       const token = generateToken('superadmin-hardcoded', email, 'superadmin', null);
+      
+      // Clear rate limit on successful login
+      clearLoginAttempts(email);
+      console.log(`✅ Superadmin login successful for ${email}`);
       
       return successResponse(res, 200, {
         token,
@@ -47,13 +115,21 @@ router.post('/login', async (req, res) => {
     // Regular user login from database
     const user = await UserRepository.findByEmail(email);
     if (!user) {
+      recordFailedAttempt(email);
+      console.warn(`⚠️  Login attempt failed: user not found for ${email}`);
       return errorResponse(res, 401, 'Invalid credentials');
     }
 
     const isPasswordValid = await verifyPassword(password, user.password_hash);
     if (!isPasswordValid) {
+      recordFailedAttempt(email);
+      console.warn(`⚠️  Login attempt failed: invalid password for ${email}`);
       return errorResponse(res, 401, 'Invalid credentials');
     }
+
+    // Clear rate limit on successful login
+    clearLoginAttempts(email);
+    console.log(`✅ User login successful for ${email} (${user.role})`);
 
     const token = generateToken(user.id, user.email, user.role, user.tenant_id);
 

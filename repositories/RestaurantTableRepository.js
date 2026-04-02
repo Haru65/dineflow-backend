@@ -51,6 +51,34 @@ class RestaurantTableRepository {
   async deactivate(id) {
     await this.updateById(id, { is_active: 0 });
   }
+
+  async createBulk(tablesData) {
+    // tablesData: Array of { tenant_id, name, identifier, qr_url, table_type }
+    const createdTables = [];
+    
+    for (const tableData of tablesData) {
+      const id = generateId();
+      const { tenant_id, name, identifier, qr_url, is_active = 1, table_type = 'regular' } = tableData;
+
+      await dbRun(
+        `INSERT INTO restaurant_tables (id, tenant_id, name, identifier, qr_url, is_active, table_type)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [id, tenant_id, name, identifier, qr_url, is_active, table_type]
+      );
+      
+      createdTables.push({
+        id,
+        tenant_id,
+        name,
+        identifier,
+        qr_url,
+        is_active,
+        table_type
+      });
+    }
+
+    return createdTables;
+  }
 }
 
 module.exports = new RestaurantTableRepository();
