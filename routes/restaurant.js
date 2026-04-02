@@ -552,9 +552,6 @@ router.post('/:tenantId/menu/bulk-update-images', authenticateToken, authorizeRe
     }
   }
 });
-    errorResponse(res, 500, 'Internal server error', error.message);
-  }
-});
 
 // ===================== ORDERS =====================
 
