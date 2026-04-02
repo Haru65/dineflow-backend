@@ -476,20 +476,27 @@ router.delete('/:tenantId/menu/items/:itemId', authenticateToken, authorizeResta
 // Auto-update image for a single menu item
 router.post('/:tenantId/menu/items/:itemId/auto-update-image', authenticateToken, authorizeRestaurantAdmin, verifyTenantAccess, async (req, res) => {
   try {
+    console.log(`🖼️ Auto-update image request for item: ${req.params.itemId}`);
+    
     const item = await MenuItemRepository.findById(req.params.itemId);
     if (!item || item.tenant_id !== req.params.tenantId) {
+      console.log(`❌ Menu item not found or tenant mismatch: ${req.params.itemId}`);
       return errorResponse(res, 404, 'Menu item not found');
     }
+
+    console.log(`📝 Found menu item: ${item.name} (current image: ${item.image_url || 'none'})`);
 
     const imageUrl = await MenuItemRepository.autoUpdateImage(req.params.itemId);
     
     if (imageUrl) {
+      console.log(`✅ Image updated successfully: ${imageUrl}`);
       successResponse(res, 200, { 
         id: req.params.itemId, 
         name: item.name,
         image_url: imageUrl 
       }, 'Image updated successfully');
     } else {
+      console.log(`⚠️ No suitable image found for: ${item.name}`);
       successResponse(res, 200, { 
         id: req.params.itemId, 
         name: item.name,
@@ -497,18 +504,33 @@ router.post('/:tenantId/menu/items/:itemId/auto-update-image', authenticateToken
       }, 'No suitable image found');
     }
   } catch (error) {
-    console.error('Auto-update image error:', error);
-    errorResponse(res, 500, 'Internal server error', error.message);
+    console.error('❌ Auto-update image error:', error);
+    console.error('Error stack:', error.stack);
+    
+    // Check for specific error types
+    if (error.message.includes('API key')) {
+      return errorResponse(res, 400, 'Image service configuration error', error.message);
+    } else if (error.message.includes('rate limit')) {
+      return errorResponse(res, 429, 'Rate limit exceeded', error.message);
+    } else if (error.message.includes('timeout')) {
+      return errorResponse(res, 408, 'Request timeout', error.message);
+    } else {
+      return errorResponse(res, 500, 'Internal server error', error.message);
+    }
   }
 });
 
 // Bulk auto-update images for all menu items without images
 router.post('/:tenantId/menu/bulk-update-images', authenticateToken, authorizeRestaurantAdmin, verifyTenantAccess, async (req, res) => {
   try {
+    console.log(`🖼️ Bulk image update request for tenant: ${req.params.tenantId}`);
+    
     const results = await MenuItemRepository.bulkUpdateMissingImages(req.params.tenantId);
     
     const successful = results.filter(r => r.success).length;
     const failed = results.filter(r => !r.success).length;
+    
+    console.log(`📊 Bulk update completed: ${successful} successful, ${failed} failed`);
     
     successResponse(res, 200, {
       total: results.length,
@@ -517,7 +539,19 @@ router.post('/:tenantId/menu/bulk-update-images', authenticateToken, authorizeRe
       results
     }, `Bulk image update completed: ${successful} successful, ${failed} failed`);
   } catch (error) {
-    console.error('Bulk update images error:', error);
+    console.error('❌ Bulk update images error:', error);
+    console.error('Error stack:', error.stack);
+    
+    // Check for specific error types
+    if (error.message.includes('API key')) {
+      return errorResponse(res, 400, 'Image service configuration error', error.message);
+    } else if (error.message.includes('rate limit')) {
+      return errorResponse(res, 429, 'Rate limit exceeded', error.message);
+    } else {
+      return errorResponse(res, 500, 'Internal server error', error.message);
+    }
+  }
+});
     errorResponse(res, 500, 'Internal server error', error.message);
   }
 });
