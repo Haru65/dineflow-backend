@@ -441,6 +441,10 @@ router.put('/:tenantId/menu/items/:itemId', authenticateToken, authorizeRestaura
     if (is_available !== undefined) updates.is_available = is_available;
     if (image_url !== undefined) updates.image_url = image_url;
 
+    if (Object.keys(updates).length === 0) {
+      return errorResponse(res, 400, 'No fields to update');
+    }
+
     await MenuItemRepository.updateById(req.params.itemId, updates);
     const updated = await MenuItemRepository.findById(req.params.itemId);
 
