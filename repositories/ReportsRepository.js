@@ -142,7 +142,7 @@ class ReportsRepository {
       WHERE o.tenant_id = $1 
         AND DATE(o.created_at) BETWEEN $2 AND $3
         AND o.status IN ('completed', 'served')
-      GROUP BY mi.id
+      GROUP BY mi.id, mi.name, mc.name, mi.price, mi.is_veg, mi.is_spicy
       ORDER BY total_quantity DESC
     `;
     
@@ -162,7 +162,7 @@ class ReportsRepository {
       WHERE o.tenant_id = $1 
         AND DATE(o.created_at) BETWEEN $2 AND $3
         AND o.status IN ('completed', 'served')
-      GROUP BY mc.id
+      GROUP BY mc.id, mc.name
       ORDER BY total_revenue DESC
     `;
     

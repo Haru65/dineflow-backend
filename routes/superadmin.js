@@ -216,6 +216,40 @@ router.delete('/tenants/:id', authenticateToken, authorizeSuperadmin, async (req
   }
 });
 
+// Pause tenant access
+router.patch('/tenants/:id/pause', authenticateToken, authorizeSuperadmin, async (req, res) => {
+  try {
+    const tenant = await TenantRepository.findById(req.params.id);
+    if (!tenant) {
+      return errorResponse(res, 404, 'Tenant not found');
+    }
+
+    await TenantRepository.updateById(req.params.id, { is_active: 0 });
+    const updated = await TenantRepository.findById(req.params.id);
+    successResponse(res, 200, updated, 'Tenant paused successfully');
+  } catch (error) {
+    console.error('Pause tenant error:', error);
+    errorResponse(res, 500, 'Internal server error', error.message);
+  }
+});
+
+// Resume tenant access
+router.patch('/tenants/:id/resume', authenticateToken, authorizeSuperadmin, async (req, res) => {
+  try {
+    const tenant = await TenantRepository.findById(req.params.id);
+    if (!tenant) {
+      return errorResponse(res, 404, 'Tenant not found');
+    }
+
+    await TenantRepository.updateById(req.params.id, { is_active: 1 });
+    const updated = await TenantRepository.findById(req.params.id);
+    successResponse(res, 200, updated, 'Tenant resumed successfully');
+  } catch (error) {
+    console.error('Resume tenant error:', error);
+    errorResponse(res, 500, 'Internal server error', error.message);
+  }
+});
+
 // Get superadmin dashboard metrics
 router.get('/dashboard/metrics', authenticateToken, authorizeSuperadmin, async (req, res) => {
   try {
