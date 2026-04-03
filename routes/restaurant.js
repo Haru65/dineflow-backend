@@ -506,18 +506,22 @@ router.post('/:tenantId/menu/items/:itemId/auto-update-image', authenticateToken
     
     if (imageUrl) {
       console.log(`✅ Image updated successfully: ${imageUrl}`);
-      successResponse(res, 200, { 
+      const responseData = { 
         id: req.params.itemId, 
         name: item.name,
         image_url: imageUrl 
-      }, 'Image updated successfully');
+      };
+      console.log(`📤 Sending response:`, JSON.stringify(responseData));
+      return successResponse(res, 200, responseData, 'Image updated successfully');
     } else {
       console.log(`⚠️ No suitable image found for: ${item.name}`);
-      successResponse(res, 200, { 
+      const responseData = { 
         id: req.params.itemId, 
         name: item.name,
         image_url: null 
-      }, 'No suitable image found');
+      };
+      console.log(`📤 Sending response:`, JSON.stringify(responseData));
+      return successResponse(res, 200, responseData, 'No suitable image found');
     }
   } catch (error) {
     console.error('❌ Auto-update image error:', error);

@@ -236,18 +236,41 @@ class ImageService {
         throw new Error('UNSPLASH_ACCESS_KEY is still set to placeholder value');
       }
 
-      // Try multiple ULTRA-INDIAN search strategies
-      const searchStrategies = [
-        this.getSearchQuery(dishName), // Primary ultra-Indian search
-        `traditional indian ${dishName} desi authentic homestyle`, // Fallback 1 - force Indian
-        `indian ${dishName} curry spice masala authentic`, // Fallback 2 - Indian with spices
-        `${dishName} india traditional authentic desi`, // Fallback 3 - India focus
-        `${dishName} indian food` // Final fallback
-      ];
+      // Determine if this is an Indian dish or international
+      const dishLower = dishName.toLowerCase();
+      const isIndianDish = dishLower.includes('biryani') || dishLower.includes('curry') || 
+                          dishLower.includes('masala') || dishLower.includes('tandoori') ||
+                          dishLower.includes('paneer') || dishLower.includes('dal') ||
+                          dishLower.includes('naan') || dishLower.includes('roti') ||
+                          dishLower.includes('dosa') || dishLower.includes('idli') ||
+                          dishLower.includes('samosa') || dishLower.includes('chai') ||
+                          dishLower.includes('lassi') || dishLower.includes('tikka');
+
+      let searchStrategies;
+      
+      if (isIndianDish) {
+        // For Indian dishes, use Indian-focused searches
+        searchStrategies = [
+          this.getSearchQuery(dishName), // Primary ultra-Indian search
+          `traditional indian ${dishName} desi authentic homestyle`,
+          `indian ${dishName} curry spice masala authentic`,
+          `${dishName} india traditional authentic desi`,
+          `${dishName} indian food`
+        ];
+      } else {
+        // For non-Indian dishes, use generic food searches
+        searchStrategies = [
+          `${dishName} food dish served plate restaurant`, // Generic food search
+          `${dishName} meal prepared served`,
+          `${dishName} restaurant food`,
+          `${dishName} dish plate`,
+          `${dishName} food`
+        ];
+      }
 
       for (let i = 0; i < searchStrategies.length; i++) {
         const searchQuery = searchStrategies[i];
-        console.log(`🔍 Searching Unsplash (attempt ${i + 1}): "${dishName}" → "${searchQuery}"`);
+        console.log(`🔍 Searching Unsplash (attempt ${i + 1}/${searchStrategies.length}): "${dishName}" → "${searchQuery}"`);
 
         const imageUrl = await this.searchUnsplashWithQuery(searchQuery, dishName, i === 0);
         
@@ -317,55 +340,58 @@ class ImageService {
         let resultsToUse = response.data.results;
 
         if (useEnhancedFiltering) {
-          // STRICT filtering for ONLY prepared food and drinks (not ingredients or cooking processes)
-          const preparedFoodResults = response.data.results.filter(photo => {
-            const description = (photo.description || '').toLowerCase();
-            const altDescription = (photo.alt_description || '').toLowerCase();
-            const tags = photo.tags ? photo.tags.map(tag => tag.title.toLowerCase()).join(' ') : '';
-            
-            const combinedText = `${description} ${altDescription} ${tags}`;
-            
-            // MUST have prepared food/drink keywords (not ingredients or processes)
-            const preparedFoodKeywords = ['dish', 'meal', 'plate', 'bowl', 'served', 'cooked', 'prepared', 'ready', 'restaurant', 'curry', 'rice', 'bread', 'drink', 'beverage', 'cup', 'glass', 'served'];
-            const hasPreparedFood = preparedFoodKeywords.some(keyword => combinedText.includes(keyword));
-            
-            // MUST have Indian context
-            const indianKeywords = ['indian', 'india', 'curry', 'masala', 'tandoori', 'biryani', 'naan', 'dal', 'paneer', 'tikka', 'dosa', 'chai', 'lassi'];
-            const hasIndian = indianKeywords.some(keyword => combinedText.includes(keyword));
-            
-            // EXCLUDE ingredients, raw materials, cooking processes, and non-food items
-            const excludeKeywords = ['grinding', 'powder', 'spice', 'ingredient', 'raw', 'uncooked', 'market', 'shop', 'selling', 'vendor', 'street vendor', 'cooking process', 'preparation', 'making', 'recipe step', 'mortar', 'pestle', 'grinder'];
-            const hasExcluded = excludeKeywords.some(keyword => combinedText.includes(keyword));
-            
-            // EXCLUDE non-Indian cuisines
-            const nonIndianKeywords = ['chinese', 'italian', 'mexican', 'japanese', 'thai', 'american', 'french', 'mediterranean', 'korean'];
-            const hasNonIndian = nonIndianKeywords.some(keyword => combinedText.includes(keyword));
-            
-            return hasPreparedFood && hasIndian && !hasExcluded && !hasNonIndian;
-          });
-          
-          // If we have prepared food results, use them
-          if (preparedFoodResults.length > 0) {
-            resultsToUse = preparedFoodResults;
-          } else {
-            // Fallback: Just prepared food (any cuisine) but exclude ingredients/processes
-            const generalPreparedResults = response.data.results.filter(photo => {
+          // Check if this is an Indian dish search
+          const isIndianSearch = searchQuery.toLowerCase().includes('indian') || 
+                                searchQuery.toLowerCase().includes('curry') ||
+                                searchQuery.toLowerCase().includes('masala') ||
+                                searchQuery.toLowerCase().includes('tandoori');
+
+          if (isIndianSearch) {
+            // STRICT filtering for Indian food
+            const preparedFoodResults = response.data.results.filter(photo => {
               const description = (photo.description || '').toLowerCase();
               const altDescription = (photo.alt_description || '').toLowerCase();
               const tags = photo.tags ? photo.tags.map(tag => tag.title.toLowerCase()).join(' ') : '';
               
               const combinedText = `${description} ${altDescription} ${tags}`;
               
-              const preparedFoodKeywords = ['dish', 'meal', 'plate', 'bowl', 'served', 'cooked', 'prepared', 'ready', 'restaurant', 'food', 'drink', 'beverage', 'cup', 'glass'];
+              // MUST have prepared food/drink keywords
+              const preparedFoodKeywords = ['dish', 'meal', 'plate', 'bowl', 'served', 'cooked', 'prepared', 'ready', 'restaurant', 'curry', 'rice', 'bread', 'drink', 'beverage', 'cup', 'glass'];
               const hasPreparedFood = preparedFoodKeywords.some(keyword => combinedText.includes(keyword));
               
-              const excludeKeywords = ['grinding', 'powder', 'spice', 'ingredient', 'raw', 'uncooked', 'market', 'shop', 'selling', 'vendor', 'cooking process', 'preparation', 'making', 'recipe step', 'mortar', 'pestle', 'grinder'];
+              // MUST have Indian context
+              const indianKeywords = ['indian', 'india', 'curry', 'masala', 'tandoori', 'biryani', 'naan', 'dal', 'paneer', 'tikka', 'dosa', 'chai', 'lassi'];
+              const hasIndian = indianKeywords.some(keyword => combinedText.includes(keyword));
+              
+              // EXCLUDE ingredients and non-Indian cuisines
+              const excludeKeywords = ['grinding', 'powder', 'ingredient', 'raw', 'uncooked', 'market', 'vendor', 'chinese', 'italian', 'mexican', 'japanese', 'thai', 'american', 'french'];
               const hasExcluded = excludeKeywords.some(keyword => combinedText.includes(keyword));
               
-              return hasPreparedFood && !hasExcluded;
+              return hasPreparedFood && hasIndian && !hasExcluded;
             });
             
-            resultsToUse = generalPreparedResults.length > 0 ? generalPreparedResults : response.data.results.slice(0, 5);
+            resultsToUse = preparedFoodResults.length > 0 ? preparedFoodResults : response.data.results.slice(0, 10);
+          } else {
+            // RELAXED filtering for non-Indian food - just ensure it's prepared food
+            const preparedFoodResults = response.data.results.filter(photo => {
+              const description = (photo.description || '').toLowerCase();
+              const altDescription = (photo.alt_description || '').toLowerCase();
+              const tags = photo.tags ? photo.tags.map(tag => tag.title.toLowerCase()).join(' ') : '';
+              
+              const combinedText = `${description} ${altDescription} ${tags}`;
+              
+              // MUST have food/drink keywords
+              const foodKeywords = ['food', 'dish', 'meal', 'plate', 'bowl', 'served', 'cooked', 'prepared', 'restaurant', 'drink', 'beverage', 'cup', 'glass', 'cocktail', 'beer', 'wine'];
+              const hasFood = foodKeywords.some(keyword => combinedText.includes(keyword));
+              
+              // EXCLUDE obvious non-food items
+              const excludeKeywords = ['person', 'people', 'man', 'woman', 'child', 'building', 'car', 'phone', 'computer', 'book'];
+              const hasExcluded = excludeKeywords.some(keyword => combinedText.includes(keyword));
+              
+              return hasFood && !hasExcluded;
+            });
+            
+            resultsToUse = preparedFoodResults.length > 0 ? preparedFoodResults : response.data.results.slice(0, 10);
           }
         }
         
