@@ -8,9 +8,9 @@ class TenantRepository {
     const slug = generateSlug(name);
 
     await dbRun(
-      `INSERT INTO tenants (id, name, slug, address, contact_phone, logo_url)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [id, name, slug, address, contact_phone, logo_url || null]
+      `INSERT INTO tenants (id, name, slug, address, contact_phone, logo_url, is_active)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [id, name, slug, address, contact_phone, logo_url || null, 1]
     );
     return { id, slug };
   }

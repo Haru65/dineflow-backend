@@ -241,8 +241,10 @@ router.patch('/tenants/:id/resume', authenticateToken, authorizeSuperadmin, asyn
       return errorResponse(res, 404, 'Tenant not found');
     }
 
+    console.log(`Resuming tenant: ${req.params.id}`);
     await TenantRepository.updateById(req.params.id, { is_active: 1 });
     const updated = await TenantRepository.findById(req.params.id);
+    console.log(`Tenant resumed, is_active: ${updated.is_active}`);
     successResponse(res, 200, updated, 'Tenant resumed successfully');
   } catch (error) {
     console.error('Resume tenant error:', error);
