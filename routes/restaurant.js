@@ -476,11 +476,26 @@ router.delete('/:tenantId/menu/items/:itemId', authenticateToken, authorizeResta
 // Auto-update image for a single menu item
 router.post('/:tenantId/menu/items/:itemId/auto-update-image', authenticateToken, authorizeRestaurantAdmin, verifyTenantAccess, async (req, res) => {
   try {
+    // Prevent caching of this endpoint
+    res.set({
+      'Cache-Control': 'no-store, no-cache, must-revalidate, private',
+      'Pragma': 'no-cache',
+      'Expires': '0'
+    });
+
     console.log(`🖼️ Auto-update image request for item: ${req.params.itemId}`);
+    console.log(`   Tenant ID: ${req.params.tenantId}`);
+    console.log(`   User: ${req.user.email} (${req.user.role})`);
+    console.log(`   User Tenant: ${req.user.tenantId}`);
     
     const item = await MenuItemRepository.findById(req.params.itemId);
-    if (!item || item.tenant_id !== req.params.tenantId) {
-      console.log(`❌ Menu item not found or tenant mismatch: ${req.params.itemId}`);
+    if (!item) {
+      console.log(`❌ Menu item not found: ${req.params.itemId}`);
+      return errorResponse(res, 404, 'Menu item not found');
+    }
+    
+    if (item.tenant_id !== req.params.tenantId) {
+      console.log(`❌ Tenant mismatch: item.tenant_id=${item.tenant_id}, req.params.tenantId=${req.params.tenantId}`);
       return errorResponse(res, 404, 'Menu item not found');
     }
 
