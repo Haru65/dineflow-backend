@@ -273,6 +273,58 @@ router.patch('/tenants/:id/resume', authenticateToken, authorizeSuperadmin, asyn
   }
 });
 
+// Migration: Add is_active column to tenants table if missing
+router.post('/migrations/add-is-active-column', authenticateToken, authorizeSuperadmin, async (req, res) => {
+  try {
+    console.log('\n🔄 [MIGRATION-ENDPOINT] Running is_active column migration...');
+    const { dbRun, dbGet } = require('../database-postgres');
+
+    // Check if column already exists
+    console.log('[MIGRATION-ENDPOINT] Checking if is_active column exists...');
+    const columnExists = await dbGet(
+      `SELECT column_name FROM information_schema.columns 
+       WHERE table_name = 'tenants' AND column_name = 'is_active'`
+    );
+
+    if (columnExists) {
+      console.log('✅ [MIGRATION-ENDPOINT] is_active column already exists');
+      return successResponse(res, 200, {
+        status: 'skipped',
+        message: 'is_active column already exists'
+      });
+    }
+
+    // Add the column
+    console.log('[MIGRATION-ENDPOINT] Adding is_active column to tenants table...');
+    await dbRun(`
+      ALTER TABLE tenants 
+      ADD COLUMN is_active INTEGER DEFAULT 1
+    `);
+    console.log('✅ [MIGRATION-ENDPOINT] Column added successfully');
+
+    // Set all existing tenants to active
+    await dbRun(`
+      UPDATE tenants SET is_active = 1 WHERE is_active IS NULL
+    `);
+    console.log('✅ [MIGRATION-ENDPOINT] All tenants set to active');
+
+    successResponse(res, 200, {
+      status: 'success',
+      message: 'is_active column added and all tenants set to active'
+    });
+
+  } catch (error) {
+    console.error('❌ [MIGRATION-ENDPOINT] Error:', error.message);
+    if (error.message.includes('already exists')) {
+      return successResponse(res, 200, {
+        status: 'skipped',
+        message: 'Column already exists'
+      });
+    }
+    errorResponse(res, 500, 'Migration failed', error.message);
+  }
+});
+
 // Migration: Fix all paused tenants to active
 router.post('/migrate-tenant-status', authenticateToken, authorizeSuperadmin, async (req, res) => {
   try {
