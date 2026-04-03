@@ -3,10 +3,55 @@ const axios = require('axios');
 class ImageService {
   constructor() {
     this.imageCache = new Map();
-    this.unsplashAccessKey = process.env.UNSPLASH_ACCESS_KEY;
-    this.unsplashSecretKey = process.env.UNSPLASH_SECRET_KEY;
-    this.unsplashAppName = process.env.UNSPLASH_APP_NAME || 'DineFlow';
+    // CHANGED: Don't read env vars in constructor - read them lazily when needed
+    // This ensures env vars are available at runtime, not at module load time
+    this._unsplashAccessKey = null;
+    this._unsplashSecretKey = null;
+    this._unsplashAppName = null;
+    this._keysLoaded = false;
     this.rateLimitWarningShown = false;
+    
+    // DEBUG: Log constructor initialization order
+    console.log('🔍 ImageService Constructor - Deferred env var loading');
+    console.log('   Env variables will be read on first API call');
+  }
+
+  /**
+   * Ensure environment variables are loaded (lazy loading)
+   */
+  ensureKeysLoaded() {
+    if (this._keysLoaded) return;
+    
+    console.log('📥 Loading environment variables for Unsplash...');
+    this._unsplashAccessKey = process.env.UNSPLASH_ACCESS_KEY;
+    this._unsplashSecretKey = process.env.UNSPLASH_SECRET_KEY;
+    this._unsplashAppName = process.env.UNSPLASH_APP_NAME || 'DineFlow';
+    this._keysLoaded = true;
+    
+    // DEBUG: Log what we read from environment
+    console.log('🔍 ImageService - Env Variables Loaded:');
+    console.log(`   UNSPLASH_ACCESS_KEY present: ${!!this._unsplashAccessKey}`);
+    console.log(`   UNSPLASH_ACCESS_KEY value: ${this._unsplashAccessKey ? this._unsplashAccessKey.substring(0, 10) + '...' : 'UNDEFINED'}`);
+    console.log(`   UNSPLASH_SECRET_KEY present: ${!!this._unsplashSecretKey}`);
+    console.log(`   UNSPLASH_APP_NAME: ${this._unsplashAppName}`);
+  }
+
+  // Getter for access key (ensures keys are loaded)
+  get unsplashAccessKey() {
+    this.ensureKeysLoaded();
+    return this._unsplashAccessKey;
+  }
+
+  // Getter for secret key (ensures keys are loaded)
+  get unsplashSecretKey() {
+    this.ensureKeysLoaded();
+    return this._unsplashSecretKey;
+  }
+
+  // Getter for app name (ensures keys are loaded)
+  get unsplashAppName() {
+    this.ensureKeysLoaded();
+    return this._unsplashAppName;
   }
 
   /**
@@ -24,11 +69,19 @@ class ImageService {
    * Secret Key is reserved for OAuth operations (user authentication, uploads, etc.)
    */
   getAuthHeaders() {
-    return {
+    const headers = {
       'Authorization': `Client-ID ${this.unsplashAccessKey}`,
       'Accept-Version': 'v1',
       'User-Agent': this.unsplashAppName
     };
+    
+    // DEBUG: Log the headers being sent  
+    console.log('🔐 Auth Headers for Unsplash:');
+    console.log(`   Authorization: Client-ID ${this.unsplashAccessKey ? this.unsplashAccessKey.substring(0, 10) + '...' : 'UNDEFINED'}`);
+    console.log(`   Accept-Version: v1`);
+    console.log(`   User-Agent: ${this.unsplashAppName}`);
+    
+    return headers;
   }
 
   /**
@@ -323,9 +376,17 @@ class ImageService {
       // Log the actual search being performed
       console.log(`🌐 Unsplash API call: query="${searchQuery}" (${params.per_page} results)`);
       
+      // DEBUG: Log the full request details before sending
+      const authHeaders = this.getAuthHeaders();
+      console.log('🔍 DEBUG - API Request Details:');
+      console.log(`   URL: https://api.unsplash.com/search/photos`);
+      console.log(`   Method: GET`);
+      console.log(`   Headers:`, JSON.stringify(authHeaders, null, 2));
+      console.log(`   Params:`, JSON.stringify(params, null, 2));
+      
       const response = await axios.get(`https://api.unsplash.com/search/photos`, {
         timeout: 10000,
-        headers: this.getAuthHeaders(),
+        headers: authHeaders,
         params: params
       });
 
@@ -416,6 +477,12 @@ class ImageService {
       // Enhanced error handling
       if (error.response) {
         const status = error.response.status;
+        
+        // DEBUG: Log full error response details
+        console.error('🔴 UNSPLASH API ERROR - Full Response:');
+        console.error(`   Status: ${status}`);
+        console.error(`   Headers:`, JSON.stringify(error.response.headers, null, 2));
+        console.error(`   Body:`, JSON.stringify(error.response.data, null, 2));
 
         if (status === 401) {
           console.error(`❌ Unsplash API Authentication Error (401)`);
@@ -424,6 +491,7 @@ class ImageService {
         } else if (status === 403) {
           console.error(`❌ Unsplash API Access Forbidden (403)`);
           console.error('   Your API key may not have the required permissions');
+          console.error('   DEBUG: Unsplash response message:', error.response.data?.message || 'No message');
         } else if (status === 429) {
           console.error(`❌ Unsplash API Rate Limit Exceeded (429)`);
           console.error('   You have exceeded the 50 requests/hour limit for free tier');
