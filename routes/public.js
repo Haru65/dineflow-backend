@@ -85,7 +85,8 @@ router.get('/menu/:restaurantSlug/:tableIdentifier', async (req, res) => {
         id: tenant.id,
         name: tenant.name,
         address: tenant.address,
-        contact_phone: tenant.contact_phone
+        contact_phone: tenant.contact_phone,
+        logo_url: tenant.logo_url
       },
       table: {
         id: table.id,
