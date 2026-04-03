@@ -14,6 +14,7 @@ class PaymentProviderRepository {
       is_active = 1
     } = providerData;
 
+    
     await dbRun(
       `INSERT INTO payment_providers (id, tenant_id, provider, key_id, key_secret, webhook_secret, website, is_active)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
