@@ -543,6 +543,21 @@ router.post('/:tenantId/menu/items/:itemId/auto-update-image', authenticateToken
 
 // Bulk auto-update images for all menu items without images
 router.post('/:tenantId/menu/bulk-update-images', authenticateToken, authorizeRestaurantAdmin, verifyTenantAccess, async (req, res) => {
+
+// DEBUG: Check environment configuration
+router.get('/:tenantId/debug/image-config', authenticateToken, authorizeRestaurantAdmin, verifyTenantAccess, async (req, res) => {
+  const imageService = require('../utils/imageService');
+  res.json({
+    unsplashConfigured: !!process.env.UNSPLASH_ACCESS_KEY,
+    unsplashKeyLength: process.env.UNSPLASH_ACCESS_KEY ? process.env.UNSPLASH_ACCESS_KEY.length : 0,
+    unsplashKeyPreview: process.env.UNSPLASH_ACCESS_KEY ? process.env.UNSPLASH_ACCESS_KEY.substring(0, 10) + '...' : 'NOT SET',
+    isPlaceholder: process.env.UNSPLASH_ACCESS_KEY === 'your_unsplash_access_key_here',
+    serviceConfigured: imageService.isApiKeyConfigured()
+  });
+});
+
+// Bulk auto-update images for all menu items without images (moved down)
+router.post('/:tenantId/menu/bulk-update-images-moved', authenticateToken, authorizeRestaurantAdmin, verifyTenantAccess, async (req, res) => {
   try {
     console.log(`🖼️ Bulk image update request for tenant: ${req.params.tenantId}`);
     
