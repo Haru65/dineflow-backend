@@ -541,9 +541,6 @@ router.post('/:tenantId/menu/items/:itemId/auto-update-image', authenticateToken
   }
 });
 
-// Bulk auto-update images for all menu items without images
-router.post('/:tenantId/menu/bulk-update-images', authenticateToken, authorizeRestaurantAdmin, verifyTenantAccess, async (req, res) => {
-
 // DEBUG: Check environment configuration
 router.get('/:tenantId/debug/image-config', authenticateToken, authorizeRestaurantAdmin, verifyTenantAccess, async (req, res) => {
   const imageService = require('../utils/imageService');
