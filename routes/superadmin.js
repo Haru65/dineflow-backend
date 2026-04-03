@@ -236,18 +236,39 @@ router.patch('/tenants/:id/pause', authenticateToken, authorizeSuperadmin, async
 // Resume tenant access
 router.patch('/tenants/:id/resume', authenticateToken, authorizeSuperadmin, async (req, res) => {
   try {
+    console.log(`\n🔄 [RESUME] Attempting to resume tenant: ${req.params.id}`);
+    
     const tenant = await TenantRepository.findById(req.params.id);
     if (!tenant) {
+      console.log(`❌ [RESUME] Tenant not found: ${req.params.id}`);
       return errorResponse(res, 404, 'Tenant not found');
     }
 
-    console.log(`Resuming tenant: ${req.params.id}`);
-    await TenantRepository.updateById(req.params.id, { is_active: 1 });
+    console.log(`📊 [RESUME] Current tenant state:`, { 
+      id: tenant.id, 
+      name: tenant.name,
+      is_active: tenant.is_active 
+    });
+
+    console.log(`✅ [RESUME] Calling updateById with { is_active: 1 }`);
+    
+    try {
+      await TenantRepository.updateById(req.params.id, { is_active: 1 });
+      console.log(`✅ [RESUME] Update query executed successfully`);
+    } catch (updateError) {
+      console.error(`❌ [RESUME] Update query failed:`, updateError.message);
+      console.error(`❌ [RESUME] Stack:`, updateError.stack);
+      throw updateError;
+    }
+
     const updated = await TenantRepository.findById(req.params.id);
-    console.log(`Tenant resumed, is_active: ${updated.is_active}`);
+    console.log(`✅ [RESUME] Tenant resumed successfully, new is_active: ${updated.is_active}`);
+    
     successResponse(res, 200, updated, 'Tenant resumed successfully');
   } catch (error) {
-    console.error('Resume tenant error:', error);
+    console.error(`❌ [RESUME] Fatal error:`, error.message);
+    console.error(`❌ [RESUME] Error type:`, error.constructor.name);
+    console.error(`❌ [RESUME] Full error:`, error);
     errorResponse(res, 500, 'Internal server error', error.message);
   }
 });
@@ -255,13 +276,13 @@ router.patch('/tenants/:id/resume', authenticateToken, authorizeSuperadmin, asyn
 // Migration: Fix all paused tenants to active
 router.post('/migrate-tenant-status', authenticateToken, authorizeSuperadmin, async (req, res) => {
   try {
+    console.log('\n🔄 [MIGRATE] Starting tenant status migration...');
     const { dbRun, dbAll } = require('../database-postgres');
     
-    console.log('🔄 Starting tenant status migration...');
-
     // Get all tenants
+    console.log('[MIGRATE] Querying all tenants...');
     const tenants = await dbAll('SELECT id, name, is_active FROM tenants');
-    console.log(`📊 Found ${tenants.length} tenants`);
+    console.log(`📊 [MIGRATE] Found ${tenants.length} tenants`);
 
     const pausedCount = tenants.filter(t => !t.is_active).length;
     console.log(`   ${pausedCount} are paused (is_active = 0 or NULL)`);
@@ -269,14 +290,22 @@ router.post('/migrate-tenant-status', authenticateToken, authorizeSuperadmin, as
 
     // Update all paused tenants to active
     if (pausedCount > 0) {
-      console.log(`\n✅ Setting all ${pausedCount} paused tenants to active...`);
-      await dbRun('UPDATE tenants SET is_active = 1 WHERE is_active = 0 OR is_active IS NULL');
-      console.log(`✅ Migration complete!`);
+      console.log(`\n✅ [MIGRATE] Setting all ${pausedCount} paused tenants to active...`);
+      try {
+        await dbRun('UPDATE tenants SET is_active = 1 WHERE is_active = 0 OR is_active IS NULL');
+        console.log(`✅ [MIGRATE] Update query executed successfully`);
+      } catch (updateError) {
+        console.error(`❌ [MIGRATE] Update failed:`, updateError.message);
+        throw updateError;
+      }
     }
 
     // Get updated counts
+    console.log('[MIGRATE] Verifying migration...');
     const updatedTenants = await dbAll('SELECT id, is_active FROM tenants');
     const nowActive = updatedTenants.filter(t => t.is_active).length;
+
+    console.log(`✅ [MIGRATE] Complete: ${nowActive}/${updatedTenants.length} tenants are now active`);
 
     successResponse(res, 200, {
       total_tenants: updatedTenants.length,
@@ -285,7 +314,9 @@ router.post('/migrate-tenant-status', authenticateToken, authorizeSuperadmin, as
     }, `Migration complete: ${pausedCount} tenants activated`);
 
   } catch (error) {
-    console.error('Migration error:', error);
+    console.error(`❌ [MIGRATE] Migration error:`, error.message);
+    console.error(`❌ [MIGRATE] Error type:`, error.constructor.name);
+    console.error(`❌ [MIGRATE] Stack:`, error.stack);
     errorResponse(res, 500, 'Migration failed', error.message);
   }
 });
