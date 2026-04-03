@@ -118,16 +118,19 @@ class MenuItemRepository {
         return item.image_url;
       }
 
-      console.log(`🖼️ ${forceUpdate ? 'Force updating' : 'Auto-fetching'} image for item: ${item.name}`);
+      console.log(`🖼️ ${forceUpdate ? 'Force updating' : 'Auto-fetching'} image for item: "${item.name}"`);
+      console.log(`📤 Calling imageService.autoFetchImageForMenuItem("${item.name}", ${forceUpdate})`);
+      
       // Pass true to bypass cache when force updating to get a fresh image
       const imageUrl = await imageService.autoFetchImageForMenuItem(item.name, forceUpdate);
       
       if (imageUrl) {
         await this.updateById(id, { image_url: imageUrl });
-        console.log(`✅ Updated ${item.name} with image: ${imageUrl}`);
+        console.log(`✅ Updated "${item.name}" with image: ${imageUrl}`);
         return imageUrl;
       }
 
+      console.log(`⚠️ No image URL returned for "${item.name}"`);
       return null;
     } catch (error) {
       console.error(`Error auto-updating image for item ${id}:`, error.message);

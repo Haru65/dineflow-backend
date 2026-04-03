@@ -290,15 +290,20 @@ class ImageService {
    */
   async searchUnsplashWithQuery(searchQuery, dishName, useEnhancedFiltering = true) {
     try {
+      const params = {
+        query: searchQuery,
+        per_page: useEnhancedFiltering ? 30 : 15,
+        orientation: 'landscape',
+        content_filter: 'high'
+      };
+      
+      // Log the actual search being performed
+      console.log(`🌐 Unsplash API call: query="${searchQuery}" (${params.per_page} results)`);
+      
       const response = await axios.get(`https://api.unsplash.com/search/photos`, {
-        timeout: 10000, // 10 second timeout
+        timeout: 10000,
         headers: this.getAuthHeaders(),
-        params: {
-          query: searchQuery,
-          per_page: useEnhancedFiltering ? 30 : 15, // More results for enhanced filtering
-          orientation: 'landscape',
-          content_filter: 'high' // Filter out inappropriate content
-        }
+        params: params
       });
 
       // Check rate limit headers
@@ -410,19 +415,23 @@ class ImageService {
   }
 
   /**
-   * Fallback: Get consistent placeholder image
+   * Fallback: Get food-related placeholder image using Foodish API
+   * This ensures we always get food images, not random images
    */
   getFallbackImage(dishName) {
     try {
-      // Generate a consistent seed based on dish name for consistent images
-      const seed = dishName.toLowerCase().replace(/[^a-z0-9]/g, '');
-      const imageUrl = `https://picsum.photos/seed/${seed}/400/300`;
-
-      console.log(`🔄 Using fallback image for ${dishName}: ${imageUrl}`);
+      // Use Foodish API which returns actual food images
+      // Note: This returns a random food image, but at least it's food-related
+      const imageUrl = `https://foodish-api.com/images/burger/burger1.jpg`;
+      
+      console.log(`🔄 Using fallback food image for ${dishName}: ${imageUrl}`);
+      console.log(`⚠️ Note: Fallback image may not match "${dishName}" exactly - Unsplash API may be rate limited or unavailable`);
+      
       return imageUrl;
     } catch (error) {
       console.error(`❌ Error getting fallback image for ${dishName}:`, error.message);
-      return null;
+      // Last resort: use a generic food placeholder
+      return 'https://via.placeholder.com/400x300/FF6B6B/FFFFFF?text=Food+Image';
     }
   }
 
@@ -440,12 +449,18 @@ class ImageService {
       console.log(`🔄 Bypassing cache for: ${dishName} - fetching fresh image`);
     }
 
+    console.log(`🔍 Fetching image for dish: "${dishName}"`);
+
     // Try Unsplash API first
     let imageUrl = await this.getFoodImage(dishName);
 
     // If Unsplash fails, use fallback
     if (!imageUrl) {
+      console.warn(`⚠️ Unsplash API failed for "${dishName}", using fallback image`);
+      console.warn(`   This usually means: API key not configured, rate limit exceeded, or no results found`);
       imageUrl = this.getFallbackImage(dishName);
+    } else {
+      console.log(`✅ Successfully fetched Unsplash image for: ${dishName}`);
     }
 
     // Cache the result
@@ -460,11 +475,20 @@ class ImageService {
    * Auto-fetch image for new menu item (async, non-blocking)
    */
   async autoFetchImageForMenuItem(dishName, bypassCache = false) {
+    console.log(`📥 imageService.autoFetchImageForMenuItem called with dishName="${dishName}", bypassCache=${bypassCache}`);
+    
     try {
       const imageUrl = await this.getImageForDish(dishName, bypassCache);
+      
+      if (imageUrl) {
+        console.log(`✅ autoFetchImageForMenuItem returning: ${imageUrl}`);
+      } else {
+        console.log(`⚠️ autoFetchImageForMenuItem returning null for "${dishName}"`);
+      }
+      
       return imageUrl;
     } catch (error) {
-      console.error(`Auto-fetch image failed for ${dishName}:`, error.message);
+      console.error(`Auto-fetch image failed for "${dishName}":`, error.message);
       
       // Check for specific error types that should be propagated
       if (error.message.includes('API key') || 
@@ -479,6 +503,7 @@ class ImageService {
       }
       
       // For other errors (network issues, etc.), use fallback
+      console.log(`🔄 Using fallback for "${dishName}" due to error`);
       return this.getFallbackImage(dishName);
     }
   }

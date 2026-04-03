@@ -499,7 +499,8 @@ router.post('/:tenantId/menu/items/:itemId/auto-update-image', authenticateToken
       return errorResponse(res, 404, 'Menu item not found');
     }
 
-    console.log(`📝 Found menu item: ${item.name} (current image: ${item.image_url || 'none'})`);
+    console.log(`📝 Found menu item: "${item.name}" (current image: ${item.image_url || 'none'})`);
+    console.log(`🔍 Will search Unsplash for: "${item.name}"`);
 
     const imageUrl = await MenuItemRepository.autoUpdateImage(req.params.itemId, true);
     
