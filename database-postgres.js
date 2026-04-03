@@ -33,6 +33,8 @@ const runMigrations = async (client) => {
       slug TEXT UNIQUE NOT NULL,
       address TEXT,
       contact_phone TEXT,
+      logo_url TEXT,
+      is_active INTEGER DEFAULT 1,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,

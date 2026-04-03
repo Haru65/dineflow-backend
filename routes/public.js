@@ -74,10 +74,26 @@ router.get('/menu/:restaurantSlug/:tableIdentifier', async (req, res) => {
     // Get categories with items
     const categories = await MenuCategoryRepository.findByTenant(tenant.id);
     const categoriesWithItems = await Promise.all(
-      categories.map(async (cat) => ({
-        ...cat,
-        items: await MenuItemRepository.findByCategoryAndTenant(tenant.id, cat.id)
-      }))
+      categories.map(async (cat) => {
+        const items = await MenuItemRepository.findByCategoryAndTenant(tenant.id, cat.id);
+        return {
+          ...cat,
+          items: items.map(item => ({
+            id: item.id,
+            tenant_id: item.tenant_id,
+            category_id: item.category_id,
+            name: item.name,
+            description: item.description,
+            price: item.price,
+            image_url: item.image_url || null,
+            is_veg: item.is_veg,
+            is_spicy: item.is_spicy,
+            is_available: item.is_available,
+            tags: item.tags,
+            preparation_time: item.preparation_time
+          }))
+        };
+      })
     );
 
     successResponse(res, 200, {
