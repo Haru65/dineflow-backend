@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
 const {
   authenticateToken,
   authorizeRestaurantAdmin
@@ -22,6 +23,23 @@ const IntegrationRepository = require('../repositories/IntegrationRepository');
 const EmailConfigRepository = require('../repositories/EmailConfigRepository');
 const ReportsRepository = require('../repositories/ReportsRepository');
 const EmailService = require('../utils/emailService');
+
+// Configure multer for menu item image uploads
+const storage = multer.memoryStorage();
+const upload = multer({
+  storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only JPEG, PNG, and WebP images are allowed.'));
+    }
+  }
+});
 
 // Middleware to verify tenant access
 const verifyTenantAccess = async (req, res, next) => {
@@ -559,6 +577,42 @@ router.post('/:tenantId/menu/items/:itemId/auto-update-image', authenticateToken
     } else {
       return errorResponse(res, 500, 'Internal server error', error.message);
     }
+  }
+});
+
+// Upload image for menu item (drag and drop / file upload)
+router.post('/:tenantId/menu/items/:itemId/upload-image', authenticateToken, authorizeRestaurantAdmin, verifyTenantAccess, upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return errorResponse(res, 400, 'No image provided');
+    }
+
+    const item = await MenuItemRepository.findById(req.params.itemId);
+    if (!item) {
+      return errorResponse(res, 404, 'Menu item not found');
+    }
+
+    if (item.tenant_id !== req.params.tenantId) {
+      return errorResponse(res, 403, 'Access denied');
+    }
+
+    // Convert image to base64 data URL
+    const base64Image = req.file.buffer.toString('base64');
+    const imageUrl = `data:${req.file.mimetype};base64,${base64Image}`;
+
+    // Update menu item with image URL
+    await MenuItemRepository.updateById(req.params.itemId, { image_url: imageUrl });
+
+    // Return updated item
+    const updatedItem = await MenuItemRepository.findById(req.params.itemId);
+
+    successResponse(res, 200, updatedItem, 'Image uploaded successfully');
+  } catch (error) {
+    console.error('Upload image error:', error);
+    if (error.message.includes('Invalid file type')) {
+      return errorResponse(res, 400, 'Invalid file type', error.message);
+    }
+    errorResponse(res, 500, 'Internal server error', error.message);
   }
 });
 
