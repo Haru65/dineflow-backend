@@ -61,10 +61,7 @@ app.use('/api/paytm-fixed', paytmFixedRoutes);
 app.use('/api/paytm-debug', paytmDebugRoutes);
 app.use('/api/webhooks', webhookRoutes);
 
-// Error handling middleware (must be last)
-app.use(errorHandler);
-
-// 404 handler (before error handler)
+// 404 handler (must be before error handler but after all routes)
 app.use((req, res) => {
   res.status(404).json({ 
     error: {
@@ -73,6 +70,9 @@ app.use((req, res) => {
     }
   });
 });
+
+// Error handling middleware (must be last)
+app.use(errorHandler);
 
 // Initialize database and start server
 const PORT = process.env.PORT || 3000;

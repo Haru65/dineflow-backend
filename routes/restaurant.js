@@ -507,13 +507,19 @@ router.post('/:tenantId/menu/items/:itemId/auto-update-image', authenticateToken
     console.error('❌ Auto-update image error:', error);
     console.error('Error stack:', error.stack);
     
-    // Check for specific error types
-    if (error.message.includes('API key')) {
-      return errorResponse(res, 400, 'Image service configuration error', error.message);
+    // More specific error detection
+    if (error.message.includes('not configured')) {
+      return errorResponse(res, 400, 'Image service not configured', 'Please configure UNSPLASH_ACCESS_KEY in environment variables');
+    } else if (error.message.includes('placeholder')) {
+      return errorResponse(res, 400, 'Invalid API key configuration', 'Please update UNSPLASH_ACCESS_KEY with a real API key from https://unsplash.com/developers');
     } else if (error.message.includes('rate limit')) {
-      return errorResponse(res, 429, 'Rate limit exceeded', error.message);
+      return errorResponse(res, 429, 'Rate limit exceeded', 'Unsplash API rate limit exceeded (50 requests/hour). Please try again later or upgrade your plan.');
+    } else if (error.message.includes('Invalid') && error.message.includes('API key')) {
+      return errorResponse(res, 401, 'Invalid API key', 'Unsplash API key is invalid or expired. Please check your configuration.');
+    } else if (error.message.includes('access forbidden')) {
+      return errorResponse(res, 403, 'API access forbidden', 'Unsplash API key lacks required permissions. Please check your API key.');
     } else if (error.message.includes('timeout')) {
-      return errorResponse(res, 408, 'Request timeout', error.message);
+      return errorResponse(res, 408, 'Request timeout', 'Image fetching timed out. Please try again.');
     } else {
       return errorResponse(res, 500, 'Internal server error', error.message);
     }
@@ -542,11 +548,17 @@ router.post('/:tenantId/menu/bulk-update-images', authenticateToken, authorizeRe
     console.error('❌ Bulk update images error:', error);
     console.error('Error stack:', error.stack);
     
-    // Check for specific error types
-    if (error.message.includes('API key')) {
-      return errorResponse(res, 400, 'Image service configuration error', error.message);
+    // More specific error detection
+    if (error.message.includes('not configured')) {
+      return errorResponse(res, 400, 'Image service not configured', 'Please configure UNSPLASH_ACCESS_KEY in environment variables');
+    } else if (error.message.includes('placeholder')) {
+      return errorResponse(res, 400, 'Invalid API key configuration', 'Please update UNSPLASH_ACCESS_KEY with a real API key from https://unsplash.com/developers');
     } else if (error.message.includes('rate limit')) {
-      return errorResponse(res, 429, 'Rate limit exceeded', error.message);
+      return errorResponse(res, 429, 'Rate limit exceeded', 'Unsplash API rate limit exceeded (50 requests/hour). Please try again later or upgrade your plan.');
+    } else if (error.message.includes('Invalid') && error.message.includes('API key')) {
+      return errorResponse(res, 401, 'Invalid API key', 'Unsplash API key is invalid or expired. Please check your configuration.');
+    } else if (error.message.includes('access forbidden')) {
+      return errorResponse(res, 403, 'API access forbidden', 'Unsplash API key lacks required permissions. Please check your API key.');
     } else {
       return errorResponse(res, 500, 'Internal server error', error.message);
     }

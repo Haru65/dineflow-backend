@@ -229,15 +229,11 @@ class ImageService {
   async getFoodImage(dishName) {
     try {
       if (!this.unsplashAccessKey) {
-        console.error('❌ UNSPLASH_ACCESS_KEY not configured in .env file');
-        console.error('   Please set your Unsplash API key to enable image fetching');
-        return null;
+        throw new Error('UNSPLASH_ACCESS_KEY not configured in .env file');
       }
 
       if (!this.isApiKeyConfigured()) {
-        console.error('❌ UNSPLASH_ACCESS_KEY is still set to placeholder value');
-        console.error('   Please update it with your real Unsplash API key from https://unsplash.com/developers');
-        return null;
+        throw new Error('UNSPLASH_ACCESS_KEY is still set to placeholder value');
       }
 
       // Try multiple ULTRA-INDIAN search strategies
@@ -269,6 +265,21 @@ class ImageService {
       console.log(`⚠️ No images found for ${dishName} with any search strategy`);
       return null;
     } catch (error) {
+      // If it's a configuration error, throw it to be handled upstream
+      if (error.message.includes('not configured') || error.message.includes('placeholder')) {
+        throw error;
+      }
+      
+      // If it's an API error, throw specific error
+      if (error.response?.status === 401) {
+        throw new Error('Invalid Unsplash API key - authentication failed');
+      } else if (error.response?.status === 429) {
+        throw new Error('Unsplash API rate limit exceeded - 50 requests/hour limit reached');
+      } else if (error.response?.status === 403) {
+        throw new Error('Unsplash API access forbidden - check API key permissions');
+      }
+      
+      // For other errors, log and return null (will trigger fallback)
       console.error(`❌ Error in getFoodImage for ${dishName}:`, error.message);
       return null;
     }
@@ -447,7 +458,20 @@ class ImageService {
       return imageUrl;
     } catch (error) {
       console.error(`Auto-fetch image failed for ${dishName}:`, error.message);
-      // Return fallback even if there's an error
+      
+      // Check for specific error types that should be propagated
+      if (error.message.includes('API key') || 
+          error.message.includes('rate limit') || 
+          error.message.includes('not configured') ||
+          error.message.includes('placeholder') ||
+          error.message.includes('Invalid') ||
+          error.message.includes('401') || 
+          error.message.includes('429') ||
+          error.message.includes('403')) {
+        throw error; // Propagate configuration/rate limit errors
+      }
+      
+      // For other errors (network issues, etc.), use fallback
       return this.getFallbackImage(dishName);
     }
   }
