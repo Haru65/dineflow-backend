@@ -347,4 +347,72 @@ router.post('/tenants/:tenantId/payment-config', authenticateToken, authorizeSup
   }
 });
 
+// ===================== TEMPORARY MIGRATION ENDPOINT =====================
+// Run this once to add logo_url column, then you can remove this endpoint
+
+router.post('/migrate-logo-column', authenticateToken, authorizeSuperadmin, async (req, res) => {
+  try {
+    const { dbRun, dbGet } = require('../database-postgres');
+    
+    console.log('🔄 Checking if logo_url column exists...');
+    
+    // Check if column already exists
+    const checkResult = await dbGet(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'tenants' AND column_name = 'logo_url'
+    `);
+    
+    if (checkResult) {
+      console.log('✅ Column already exists');
+      return successResponse(res, 200, { 
+        status: 'already_exists',
+        message: 'logo_url column already exists in tenants table',
+        columnExists: true
+      });
+    }
+    
+    console.log('📝 Adding logo_url column to tenants table...');
+    
+    // Add the column
+    await dbRun('ALTER TABLE tenants ADD COLUMN logo_url TEXT');
+    
+    console.log('✅ Column added successfully');
+    
+    // Verify it was added
+    const verifyResult = await dbGet(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'tenants' AND column_name = 'logo_url'
+    `);
+    
+    if (verifyResult) {
+      console.log('✅ Verification successful');
+      return successResponse(res, 200, { 
+        status: 'success',
+        message: 'logo_url column added successfully to tenants table',
+        columnExists: true,
+        migrationCompleted: true
+      });
+    } else {
+      console.error('❌ Verification failed');
+      return errorResponse(res, 500, 'Column added but verification failed');
+    }
+    
+  } catch (error) {
+    console.error('❌ Migration error:', error);
+    
+    // Check if error is because column already exists
+    if (error.message && error.message.includes('already exists')) {
+      return successResponse(res, 200, { 
+        status: 'already_exists',
+        message: 'logo_url column already exists in tenants table',
+        columnExists: true
+      });
+    }
+    
+    return errorResponse(res, 500, 'Migration failed', error.message);
+  }
+});
+
 module.exports = router;
