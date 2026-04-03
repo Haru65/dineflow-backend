@@ -223,9 +223,10 @@ function rateLimit(windowMs = 60000, maxRequests = 100) {
  */
 function validateContentType(req, res, next) {
   if (req.method !== 'GET' && req.method !== 'DELETE') {
-    // Skip content-type validation for menu extraction routes (they use multipart/form-data)
+    // Skip content-type validation for routes that use multipart/form-data (file uploads)
     if (req.path.includes('/menu/extract-from-image') || 
-        req.path.includes('/menu/extract-and-import')) {
+        req.path.includes('/menu/extract-and-import') ||
+        req.path.includes('/admin/superadmin/tenants')) {
       return next();
     }
     
