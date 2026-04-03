@@ -252,6 +252,44 @@ router.patch('/tenants/:id/resume', authenticateToken, authorizeSuperadmin, asyn
   }
 });
 
+// Migration: Fix all paused tenants to active
+router.post('/migrate-tenant-status', authenticateToken, authorizeSuperadmin, async (req, res) => {
+  try {
+    const { dbRun, dbAll } = require('../database-postgres');
+    
+    console.log('🔄 Starting tenant status migration...');
+
+    // Get all tenants
+    const tenants = await dbAll('SELECT id, name, is_active FROM tenants');
+    console.log(`📊 Found ${tenants.length} tenants`);
+
+    const pausedCount = tenants.filter(t => !t.is_active).length;
+    console.log(`   ${pausedCount} are paused (is_active = 0 or NULL)`);
+    console.log(`   ${tenants.length - pausedCount} are active (is_active = 1)`);
+
+    // Update all paused tenants to active
+    if (pausedCount > 0) {
+      console.log(`\n✅ Setting all ${pausedCount} paused tenants to active...`);
+      await dbRun('UPDATE tenants SET is_active = 1 WHERE is_active = 0 OR is_active IS NULL');
+      console.log(`✅ Migration complete!`);
+    }
+
+    // Get updated counts
+    const updatedTenants = await dbAll('SELECT id, is_active FROM tenants');
+    const nowActive = updatedTenants.filter(t => t.is_active).length;
+
+    successResponse(res, 200, {
+      total_tenants: updatedTenants.length,
+      now_active: nowActive,
+      fixed_count: pausedCount
+    }, `Migration complete: ${pausedCount} tenants activated`);
+
+  } catch (error) {
+    console.error('Migration error:', error);
+    errorResponse(res, 500, 'Migration failed', error.message);
+  }
+});
+
 // Get superadmin dashboard metrics
 router.get('/dashboard/metrics', authenticateToken, authorizeSuperadmin, async (req, res) => {
   try {
