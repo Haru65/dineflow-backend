@@ -106,19 +106,19 @@ class MenuItemRepository {
   /**
    * Auto-fetch and update image for existing menu item
    */
-  async autoUpdateImage(id) {
+  async autoUpdateImage(id, forceUpdate = true) {
     try {
       const item = await this.findById(id);
       if (!item) {
         throw new Error('Menu item not found');
       }
 
-      if (item.image_url) {
+      if (item.image_url && !forceUpdate) {
         console.log(`Item ${item.name} already has image: ${item.image_url}`);
         return item.image_url;
       }
 
-      console.log(`🖼️ Auto-fetching image for existing item: ${item.name}`);
+      console.log(`🖼️ ${forceUpdate ? 'Force updating' : 'Auto-fetching'} image for item: ${item.name}`);
       const imageUrl = await imageService.autoFetchImageForMenuItem(item.name);
       
       if (imageUrl) {

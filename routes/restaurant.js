@@ -486,7 +486,7 @@ router.post('/:tenantId/menu/items/:itemId/auto-update-image', authenticateToken
 
     console.log(`📝 Found menu item: ${item.name} (current image: ${item.image_url || 'none'})`);
 
-    const imageUrl = await MenuItemRepository.autoUpdateImage(req.params.itemId);
+    const imageUrl = await MenuItemRepository.autoUpdateImage(req.params.itemId, true);
     
     if (imageUrl) {
       console.log(`✅ Image updated successfully: ${imageUrl}`);
