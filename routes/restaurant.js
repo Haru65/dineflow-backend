@@ -36,6 +36,22 @@ const verifyTenantAccess = async (req, res, next) => {
   }
 };
 
+// ===================== RESTAURANT INFO =====================
+
+// Get restaurant info
+router.get('/:tenantId/info', authenticateToken, authorizeRestaurantAdmin, verifyTenantAccess, async (req, res) => {
+  try {
+    const tenant = await TenantRepository.findById(req.params.tenantId);
+    if (!tenant) {
+      return errorResponse(res, 404, 'Restaurant not found');
+    }
+    successResponse(res, 200, tenant);
+  } catch (error) {
+    console.error('Get restaurant info error:', error);
+    errorResponse(res, 500, 'Internal server error', error.message);
+  }
+});
+
 // ===================== TABLES =====================
 
 // Get all tables for restaurant
@@ -559,7 +575,7 @@ router.get('/:tenantId/debug/image-config', authenticateToken, authorizeRestaura
 });
 
 // Bulk auto-update images for all menu items without images (moved down)
-router.post('/:tenantId/menu/bulk-update-images-moved', authenticateToken, authorizeRestaurantAdmin, verifyTenantAccess, async (req, res) => {
+router.post('/:tenantId/menu/bulk-update-images', authenticateToken, authorizeRestaurantAdmin, verifyTenantAccess, async (req, res) => {
   try {
     console.log(`🖼️ Bulk image update request for tenant: ${req.params.tenantId}`);
     
