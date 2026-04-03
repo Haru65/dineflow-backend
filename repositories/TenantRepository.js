@@ -4,13 +4,13 @@ const { generateId, generateSlug } = require('../utils/helpers');
 class TenantRepository {
   async create(tenantData) {
     const id = generateId();
-    const { name, address, contact_phone } = tenantData;
+    const { name, address, contact_phone, logo_url } = tenantData;
     const slug = generateSlug(name);
 
     await dbRun(
-      `INSERT INTO tenants (id, name, slug, address, contact_phone)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [id, name, slug, address, contact_phone]
+      `INSERT INTO tenants (id, name, slug, address, contact_phone, logo_url)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [id, name, slug, address, contact_phone, logo_url || null]
     );
     return { id, slug };
   }

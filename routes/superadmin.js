@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
 const TenantRepository = require('../repositories/TenantRepository');
 const UserRepository = require('../repositories/UserRepository');
 const PaymentProviderRepository = require('../repositories/PaymentProviderRepository');
@@ -16,6 +17,23 @@ const {
   successResponse
 } = require('../utils/helpers');
 const { createDefaultCategories } = require('../utils/defaultCategories');
+
+// Configure multer for logo uploads
+const storage = multer.memoryStorage();
+const upload = multer({
+  storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only JPEG, PNG, and WebP images are allowed.'));
+    }
+  }
+});
 
 // Get all tenants
 router.get('/tenants', authenticateToken, authorizeSuperadmin, async (req, res) => {
@@ -58,8 +76,8 @@ router.get('/tenants/:id', authenticateToken, authorizeSuperadmin, async (req, r
   }
 });
 
-// Create tenant
-router.post('/tenants', authenticateToken, authorizeSuperadmin, async (req, res) => {
+// Create tenant with optional logo
+router.post('/tenants', authenticateToken, authorizeSuperadmin, upload.single('logo'), async (req, res) => {
   try {
     const { name, address, contact_phone, adminEmail, adminPassword, adminName } = req.body;
 
@@ -77,11 +95,20 @@ router.post('/tenants', authenticateToken, authorizeSuperadmin, async (req, res)
       return errorResponse(res, 409, 'User with this email already exists');
     }
 
+    // Handle logo upload if provided
+    let logoUrl = null;
+    if (req.file) {
+      // Convert image to base64 data URL
+      const base64Image = req.file.buffer.toString('base64');
+      logoUrl = `data:${req.file.mimetype};base64,${base64Image}`;
+    }
+
     // Create tenant
     const { id: tenantId, slug } = await TenantRepository.create({
       name,
       address,
-      contact_phone
+      contact_phone,
+      logo_url: logoUrl
     });
 
     // Create restaurant admin
@@ -102,16 +129,20 @@ router.post('/tenants', authenticateToken, authorizeSuperadmin, async (req, res)
       slug,
       adminId,
       adminEmail,
+      logoUrl,
       defaultCategories: defaultCategoryIds
     }, 'Tenant, admin, and default categories created successfully');
   } catch (error) {
     console.error('Create tenant error:', error);
+    if (error.message.includes('Invalid file type')) {
+      return errorResponse(res, 400, 'Invalid file type', error.message);
+    }
     errorResponse(res, 500, 'Internal server error', error.message);
   }
 });
 
-// Update tenant
-router.put('/tenants/:id', authenticateToken, authorizeSuperadmin, async (req, res) => {
+// Update tenant with optional logo
+router.put('/tenants/:id', authenticateToken, authorizeSuperadmin, upload.single('logo'), async (req, res) => {
   try {
     const tenant = await TenantRepository.findById(req.params.id);
     if (!tenant) {
@@ -123,6 +154,12 @@ router.put('/tenants/:id', authenticateToken, authorizeSuperadmin, async (req, r
     if (name) updates.name = name;
     if (address) updates.address = address;
     if (contact_phone) updates.contact_phone = contact_phone;
+
+    // Handle logo upload if provided
+    if (req.file) {
+      const base64Image = req.file.buffer.toString('base64');
+      updates.logo_url = `data:${req.file.mimetype};base64,${base64Image}`;
+    }
 
     await TenantRepository.updateById(req.params.id, updates);
 
@@ -156,6 +193,9 @@ router.put('/tenants/:id', authenticateToken, authorizeSuperadmin, async (req, r
     successResponse(res, 200, updated, 'Tenant updated successfully');
   } catch (error) {
     console.error('Update tenant error:', error);
+    if (error.message.includes('Invalid file type')) {
+      return errorResponse(res, 400, 'Invalid file type', error.message);
+    }
     errorResponse(res, 500, 'Internal server error', error.message);
   }
 });
