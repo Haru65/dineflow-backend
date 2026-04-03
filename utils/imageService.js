@@ -364,16 +364,19 @@ class ImageService {
           }
         }
         
-        // Get the best result (most relevant)
-        const photo = resultsToUse[0];
+        // Get a random result from the top results for variety
+        // This ensures clicking "Auto-fetch" multiple times gives different images
+        const randomIndex = Math.floor(Math.random() * Math.min(resultsToUse.length, 5));
+        const photo = resultsToUse[randomIndex];
         const imageUrl = photo.urls.regular;
+
+        console.log(`✅ Found Unsplash image for ${dishName} (selected ${randomIndex + 1} of ${resultsToUse.length}): ${imageUrl}`);
 
         // IMPORTANT: Trigger download endpoint (Unsplash API requirement)
         if (photo.links && photo.links.download_location) {
           this.triggerDownload(photo.links.download_location);
         }
 
-        console.log(`✅ Found Unsplash image for ${dishName}: ${imageUrl}`);
         return imageUrl;
       }
 
@@ -426,11 +429,15 @@ class ImageService {
   /**
    * Get the best available image for a dish
    */
-  async getImageForDish(dishName) {
-    // Check cache first
-    if (this.imageCache.has(dishName)) {
+  async getImageForDish(dishName, bypassCache = false) {
+    // Check cache first (unless bypassing)
+    if (!bypassCache && this.imageCache.has(dishName)) {
       console.log(`📋 Using cached image for: ${dishName}`);
       return this.imageCache.get(dishName);
+    }
+
+    if (bypassCache) {
+      console.log(`🔄 Bypassing cache for: ${dishName} - fetching fresh image`);
     }
 
     // Try Unsplash API first
@@ -452,9 +459,9 @@ class ImageService {
   /**
    * Auto-fetch image for new menu item (async, non-blocking)
    */
-  async autoFetchImageForMenuItem(dishName) {
+  async autoFetchImageForMenuItem(dishName, bypassCache = false) {
     try {
-      const imageUrl = await this.getImageForDish(dishName);
+      const imageUrl = await this.getImageForDish(dishName, bypassCache);
       return imageUrl;
     } catch (error) {
       console.error(`Auto-fetch image failed for ${dishName}:`, error.message);
