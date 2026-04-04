@@ -12,6 +12,7 @@ class EmailConfigRepository {
     return id;
   }
 
+  
   async findByTenant(tenant_id) {
     return dbGet('SELECT * FROM email_configs WHERE tenant_id = $1', [tenant_id]);
   }
