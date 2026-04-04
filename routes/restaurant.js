@@ -581,8 +581,33 @@ router.post('/:tenantId/menu/items/:itemId/auto-update-image', authenticateToken
 });
 
 // Upload image for menu item (drag and drop / file upload)
-router.post('/:tenantId/menu/items/:itemId/upload-image', authenticateToken, authorizeRestaurantAdmin, verifyTenantAccess, upload.single('image'), async (req, res) => {
+router.post('/:tenantId/menu/items/:itemId/upload-image', authenticateToken, authorizeRestaurantAdmin, verifyTenantAccess, (req, res, next) => {
+  upload.single('image')(req, res, (err) => {
+    if (err) {
+      console.error('Multer upload error:', err);
+      if (err instanceof multer.MulterError) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          return errorResponse(res, 400, 'File too large', 'Maximum file size is 5MB');
+        }
+        return errorResponse(res, 400, 'Upload error', err.message);
+      }
+      if (err.message.includes('Invalid file type')) {
+        return errorResponse(res, 400, 'Invalid file type', 'Only JPEG, PNG, and WebP images are allowed');
+      }
+      return errorResponse(res, 400, 'Upload failed', err.message);
+    }
+    next();
+  });
+}, async (req, res) => {
   try {
+    console.log('Upload request received:', {
+      hasFile: !!req.file,
+      fileSize: req.file?.size,
+      mimeType: req.file?.mimetype,
+      itemId: req.params.itemId,
+      tenantId: req.params.tenantId
+    });
+
     if (!req.file) {
       return errorResponse(res, 400, 'No image provided');
     }
@@ -600,18 +625,18 @@ router.post('/:tenantId/menu/items/:itemId/upload-image', authenticateToken, aut
     const base64Image = req.file.buffer.toString('base64');
     const imageUrl = `data:${req.file.mimetype};base64,${base64Image}`;
 
+    console.log('Image converted to base64, length:', imageUrl.length);
+
     // Update menu item with image URL
     await MenuItemRepository.updateById(req.params.itemId, { image_url: imageUrl });
 
     // Return updated item
     const updatedItem = await MenuItemRepository.findById(req.params.itemId);
 
+    console.log('Image uploaded successfully for item:', req.params.itemId);
     successResponse(res, 200, updatedItem, 'Image uploaded successfully');
   } catch (error) {
     console.error('Upload image error:', error);
-    if (error.message.includes('Invalid file type')) {
-      return errorResponse(res, 400, 'Invalid file type', error.message);
-    }
     errorResponse(res, 500, 'Internal server error', error.message);
   }
 });

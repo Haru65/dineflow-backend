@@ -226,6 +226,7 @@ function validateContentType(req, res, next) {
     // Skip content-type validation for routes that use multipart/form-data (file uploads)
     if (req.path.includes('/menu/extract-from-image') || 
         req.path.includes('/menu/extract-and-import') ||
+        req.path.includes('/upload-image') ||
         req.path.includes('/admin/superadmin/tenants')) {
       return next();
     }
