@@ -16,6 +16,7 @@ const {
   successResponse
 } = require('../utils/helpers');
 const OffersRepository = require('../repositories/OffersRepository');
+const ComboRepository = require('../repositories/ComboRepository');
 const ReceptionistQRRepository = require('../repositories/ReceptionistQRRepository');
 const QuickActionsRepository = require('../repositories/QuickActionsRepository');
 const MenuItemRepository = require('../repositories/MenuItemRepository');
@@ -309,3 +310,131 @@ router.delete('/:tenantId/quick-actions/:actionId', authenticateToken, authorize
 });
 
 module.exports = router;
+
+
+// ===================== COMBO OFFERS =====================
+
+// Get all combos for restaurant
+router.get('/:tenantId/combos', authenticateToken, authorizeRestaurantAdmin, verifyTenantAccess, async (req, res) => {
+  try {
+    const combos = await ComboRepository.findByTenant(req.params.tenantId);
+    successResponse(res, 200, combos);
+  } catch (error) {
+    console.error('Get combos error:', error);
+    errorResponse(res, 500, 'Internal server error', error.message);
+  }
+});
+
+// Get active combos for customer view
+router.get('/:tenantId/combos/active', async (req, res) => {
+  try {
+    const combos = await ComboRepository.findActiveByTenant(req.params.tenantId);
+    successResponse(res, 200, combos);
+  } catch (error) {
+    console.error('Get active combos error:', error);
+    errorResponse(res, 500, 'Internal server error', error.message);
+  }
+});
+
+// Create combo offer
+router.post('/:tenantId/combos', authenticateToken, authorizeRestaurantAdmin, verifyTenantAccess, async (req, res) => {
+  try {
+    const { name, description, combo_price, image_url, valid_from, valid_until, items } = req.body;
+
+    if (!name || !combo_price) {
+      return errorResponse(res, 400, 'Name and combo price are required');
+    }
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return errorResponse(res, 400, 'At least one menu item is required');
+    }
+
+    // Calculate original price from items
+    const original_price = await ComboRepository.calculateOriginalPrice(items);
+
+    // Create combo
+    const comboId = await ComboRepository.create({
+      tenant_id: req.params.tenantId,
+      name,
+      description,
+      combo_price: parseFloat(combo_price),
+      original_price,
+      image_url,
+      valid_from,
+      valid_until
+    });
+
+    // Add items to combo
+    await ComboRepository.addItems(comboId, items);
+
+    // Fetch complete combo with items
+    const combo = await ComboRepository.findById(comboId);
+
+    successResponse(res, 201, combo, 'Combo created successfully');
+  } catch (error) {
+    console.error('Create combo error:', error);
+    errorResponse(res, 500, 'Internal server error', error.message);
+  }
+});
+
+// Update combo offer
+router.put('/:tenantId/combos/:comboId', authenticateToken, authorizeRestaurantAdmin, verifyTenantAccess, async (req, res) => {
+  try {
+    const { comboId } = req.params;
+    const { name, description, combo_price, image_url, valid_from, valid_until, is_active, items } = req.body;
+
+    const combo = await ComboRepository.findById(comboId);
+    if (!combo) {
+      return errorResponse(res, 404, 'Combo not found');
+    }
+
+    // If items are being updated, recalculate original price
+    let original_price = combo.original_price;
+    if (items && Array.isArray(items)) {
+      original_price = await ComboRepository.calculateOriginalPrice(items);
+      
+      // Delete old items and add new ones
+      await ComboRepository.deleteItems(comboId);
+      await ComboRepository.addItems(comboId, items);
+    }
+
+    // Update combo
+    await ComboRepository.updateById(comboId, {
+      name: name || combo.name,
+      description: description !== undefined ? description : combo.description,
+      combo_price: combo_price ? parseFloat(combo_price) : combo.combo_price,
+      original_price,
+      image_url: image_url !== undefined ? image_url : combo.image_url,
+      valid_from: valid_from !== undefined ? valid_from : combo.valid_from,
+      valid_until: valid_until !== undefined ? valid_until : combo.valid_until,
+      is_active: is_active !== undefined ? is_active : combo.is_active
+    });
+
+    // Fetch updated combo
+    const updated = await ComboRepository.findById(comboId);
+
+    successResponse(res, 200, updated, 'Combo updated successfully');
+  } catch (error) {
+    console.error('Update combo error:', error);
+    errorResponse(res, 500, 'Internal server error', error.message);
+  }
+});
+
+// Delete combo offer
+router.delete('/:tenantId/combos/:comboId', authenticateToken, authorizeRestaurantAdmin, verifyTenantAccess, async (req, res) => {
+  try {
+    const { comboId } = req.params;
+
+    const combo = await ComboRepository.findById(comboId);
+    if (!combo) {
+      return errorResponse(res, 404, 'Combo not found');
+    }
+
+    await ComboRepository.deleteById(comboId);
+
+    successResponse(res, 200, {}, 'Combo deleted successfully');
+  } catch (error) {
+    console.error('Delete combo error:', error);
+    errorResponse(res, 500, 'Internal server error', error.message);
+  }
+});
